@@ -1,0 +1,123 @@
+[
+ {
+  "name": "startpos",
+  "fen": "sjyhxfdoodfxhyjs/cmztuvlkalvutzmc/ernbwigqqgiwbnre/pppppppppppppppp/16/16/16/16/16/16/16/16/PPPPPPPPPPPPPPPP/ERNBWIGQQGIWBNRE/CMZTUVLKALVUTZMC/SJYHXFDOODFXHYJS w Kk - 0 1",
+  "perft": {
+   "1": 54,
+   "2": 2916,
+   "3": 175508
+  }
+ },
+ {
+  "name": "walk012",
+  "fen": "sjyhxfdoodfxhyjs/cmztuvlkalvutzmc/ern1wigqqgiwb1re/ppp2pppp1ppppp1/3pp9n1/9p1B3p/7b8/16/16/16/4P5P2P2/1P14/P1PP1PPPPP1PPBPP/ERN1WIGQQGIW1NRE/CMZTUVLKALVUTZMC/SJYHXFDOODFXHYJS w Kk - 0 7",
+  "perft": {
+   "1": 98,
+   "2": 8949
+  }
+ },
+ {
+  "name": "walk020",
+  "fen": "sjyhxfdoo2xhyjs/cmztuvlkalvutzmc/ernbwigqqgifbnre/p1ppp1dp2pppppp/8p7/1p3pp2p1w4/16/16/16/16/4Q1P1P7/2E1P9NT/PPPPWP1P1PPPPPPP/1RNBI1G1QGIWB1RE/CMZTUVLKALVUXZMC/SJYHXFDOODF1HYJS w Kk - 0 11",
+  "perft": {
+   "1": 118,
+   "2": 13923
+  }
+ },
+ {
+  "name": "walk030",
+  "fen": "sjyhxfdoodfxh1js/cmztuvlkalvut1yc/er1bwigq1giwbnre/1ppppp2pppp3p/p7q4p2/1n4pp6p1/14z1/14m1/8Q7/16/1P4PP8/6T1L1P5/P1PPPP2PP1PPPPP/ERNBWIGLQGIWBNRE/CMZYUV1KATVU1ZMC/SJ1HXFDOODFXHYJS w Kk - 10 16",
+  "perft": {
+   "1": 143,
+   "2": 17910
+  }
+ },
+ {
+  "name": "walk040",
+  "fen": "s1yhxfdoodfxhyjs/ce1tuvlkalvutz1c/jrn1wig1qgiwb1re/p1bppp1pppppp2p/1p2z1p6pnm/14p1/2p3m9/8A7/9P6/7Q3W4/1q1P7Q4/M2T2P8T/PPP1PP1PP1PPPPPP/ERNBWIG2GILBNRE/C1Z1UVLK1XHUJZMC/SJYHXFDOODFV1Y1S w Kk - 8 21",
+  "perft": {
+   "1": 217,
+   "2": 28304
+  }
+ },
+ {
+  "name": "walk055",
+  "fen": "sjyhx1doodfxhyjs/c1ftuvl1g1vutz1c/e3wigqqkiwbnr1/p2pnpp1p1l2pep/m3z5pQpm2/1r2p2p1p4p1/2p4b8/11L4/Pp7a6/13P2/3PD2P1P6/4W5IP4/1PP1PPPFP1P1P1PP/ERNB1IAQKG1WBNRE/CMZTUVLG2VUTZMC/SJYHX2OODFXHYJS b - - 3 28",
+  "perft": {
+   "1": 178,
+   "2": 33155
+  }
+ },
+ {
+  "name": "walk070",
+  "fen": "sjyhx1doo1fx1yjs/cmftuv1la1vutzmc/er1bwig1qdihbwre/p1ppppp1kp4p1/3n5l2ppnp/1p5p1gpp4/8p7/2z10V2/16/11P4/5P4N2P2/PP4T3P1P3/2PPP1PPGPFWD1PP/ERNBWIGQQ1IUBXRE/CMZ1UVLKAZ2H1MC/SJYHXFDOO3LYJS w K - 9 36",
+  "perft": {
+   "1": 149,
+   "2": 22648
+  }
+ },
+ {
+  "name": "walk090",
+  "fen": "sjyhxfdood1xhy1s/cm1tuvlka1vu1j1c/1rwB1igqqgGwb1re/1pp2ppppp1p1p1p/z1e5lt1z1m2/pQ1p6p1p1p1/4p11/4n7V3/10P5/2P4P6F1/10n5/P2P7PPPP1/1P2PPPQPP5P/ERNBWI1D1GXI1NRE/CMZTU1LKALVUTZMC/SJYHXFDOOW2HYJS w Kk - 6 46",
+  "perft": {
+   "1": 185,
+   "2": 27576
+  }
+ },
+ {
+  "name": "walk110",
+  "fen": "s1yhxfdl2hx1y1s/cj1tuvof3u1zjc/er1bwi2q1iwbnre/pp1m1ap1ok2pppp/z2n1p1pp3gm2/3p3d1pp1v3/2p3l1O1Pp4/4p1t4M3P/16/5P1L8/1N2P1PQ4P2B/TP4A6P1T/P1PPI1QP1P1P2P1/ER1BW1G2GI1W1RJ/CMF1UVL2KV1UZEC/SJYHX1D1ODFXHYNS w - - 6 56",
+  "perft": {
+   "1": 243,
+   "2": 51340
+  }
+ },
+ {
+  "name": "walk130",
+  "fen": "sjy1w1doo2x1j1s/cmztu1ka1lvuh1yc/ernbhi2qgiwbnre/2l1pp1fpppp1pp1/1p1p4Q2z1m2/p1p3p8p/5Z1p4p3/2M4g5Q2/9t5f/N7B3d3/5DL6P1P/1B1PW2P3P1EP1/PP2PPPGP1v1P3/ER3I2DGI1WNR1/CH2U1X1LKVUJZMC/SJ1Y1FVOOAFXH1YS w - - 6 66",
+  "perft": {
+   "1": 256,
+   "2": 50397
+  }
+ },
+ {
+  "name": "walk150",
+  "fen": "1syhx1dOodaxhj1s/cjztuvlkg1vu2yc/eB1bwi4iwbnre/pp1n4pp2pp1p/m3p1f5t3/3U6p1F1p1/4g1p6P2/3p3l6mD/q4VT3Pq4/16/2PP1P2P2P3P/2E1PF1P1P2NWRM/PP2LZP1G3P3/1RNBWIG1Q1ILJH1E/CM1YU5V1TZ1C/SJ1HX1DKOA1X2YS w k - 7 76",
+  "perft": {
+   "1": 288,
+   "2": 66713
+  }
+ },
+ {
+  "name": "walk170",
+  "fen": "sjyhx3o2xh1ys/cm1tuldodzvuf1mc/G2f1wga1g1wj1re/1ppr1p1k2ipn1p1/3iz1ppppp1qp2/6b8b/4p11/5n10/p1Z13/2p3lY3M4/PN4PP1OP4p/1P9P4/2PPPGLWP3qPPP/ERWB1I3QI3RE/CHJYUVQ2NV2BHC/S2DXFKOAD1XL1JS w - - 4 86",
+  "perft": {
+   "1": 203,
+   "2": 45605
+  }
+ },
+ {
+  "name": "walk200",
+  "fen": "sjy1x2oox1uhyjs/1m1huv1kmd1it2c/1rnlfigql1w1b1r1/cp2wpdp1fppv1p1/1b1ppL1a3z2np/8p3p1e1/p3eG1z1F6/9p3p2/1Mp2Ep8P/5D1L2W3P1/TP1P1PP3q5/4P3PP6/PYPV1I1PQ2PUPE1/1RNB1W1FOQI3R1/C1Z1U1KHA1VXTZC1/SJ1HX2O1D2NYJS w k - 0 101",
+  "perft": {
+   "1": 299,
+   "2": 67624
+  }
+ },
+ {
+  "name": "walk240",
+  "fen": "sjyhxf1o6s1/1mztnvk6zmt/erdbi1g1i2wbhrj/3p1p5fpp2/4w1u2ppl1e1p/1pp3o5n1p1/3gx1Mp2D1q3/4p1p9/1cl3Bu4T3/5F10/P1yP10L1/2D1XP1PPp5T/1P3I1L3Q1URC/E1N1W1GQ1GAHZ1J1/SR1MUV1KOX4SN/HJY5OIWV2BE w - - 0 121",
+  "perft": {
+   "1": 274,
+   "2": 81468
+  }
+ },
+ {
+  "name": "walk280",
+  "fen": "sj1h1o1o3xh1y1/cy2bk3tvujbsc/4w1x2wi3re/1u1ni2g1p2dp2/mre1zz1m2p1p3/2Mp2p1p2f2np/p3pa2D6q/2pt1p1W5U2/6V1lB1f4/1pP2P6P2O/1P1TP1PPQP4P1/1N3J1dF1P2PN1/PG1PU3P3S2P/ER1D1X1Q1G3HRE/1CZHL1I2IX1TZYC/S1Y3W1OKL3J1 w - - 8 141",
+  "perft": {
+   "1": 300,
+   "2": 93917
+  }
+ }
+]
