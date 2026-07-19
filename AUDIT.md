@@ -83,3 +83,38 @@ SPSA del fork heredadas) — irrelevante: F2 re-deriva todas las constantes para
 branching 150–250 de todos modos. (3) Interrupción por límite de sesión a
 mitad de cirugía deja estado parcial en disco — verificar SIEMPRE el estado
 real con ls/git status antes de reanudar agentes.
+
+---
+
+## 2026-07-19 — GATE FASE 0: PASS (commit 5c4de4e)
+
+**Hipótesis**: dos implementaciones Python del oráculo escritas de forma
+independiente (mailbox vs bitboards-int, agentes distintos, sin ver el código
+del otro) + fixtures derivados a mano por un tercer agente convergen a 0
+discrepancias, dando un oráculo congelado fiable de Terachess II.
+
+**Evidencia** (toda ejecutada, exit 0):
+- `run_fixtures.py --impl both`: **87 fixtures, 0 fallos** (a la primera).
+- `differential.py`: **30.000 posiciones** en 200 partidas aleatorias
+  (6.000 + 24.000), **0 discrepancias** A↔B.
+- `test_roundtrip.py`: 10.000 (A) + 3.000 (B) posiciones, 0 fallos.
+- `test_aliasing.py`: 12/12 OK en ambas (salto de rey = 11 destinos exactos
+  del ejemplo del autor; ep-sobre-Príncipe; ep-por-casilla; troll última
+  fila; contadores; turno).
+- `perft_suite.py generate`: 15 posiciones con A computando y B verificando:
+  startpos **54 / 2.916 / 175.508** (54 = conteo a mano del arquitecto,
+  3 derivaciones independientes coinciden) + 14 random-walks (branching
+  medido 98–300 — confirma el supuesto 150–300 del plan).
+- Espec ampliada con 3 resoluciones nuevas [SUPUESTO]: doble-paso-a-última-fila
+  (promociona Y fija ep; el ep retira la pieza promocionada), movimiento
+  dentro de la última fila (promociona), simetría completa del Rhino en s1.
+
+**Decisión**: oráculo A congelado como primario (tag pendiente al cerrar F1),
+B como diferencial. Gate F0 PASS → F1 (port 256) desbloqueado como camino
+crítico (ya en marcha).
+
+**Pendiente honesto (no bloquea el gate interno, sí la canonicidad plena)**:
+cross-check externo con Jocly (subconjunto Terachess I) y FSF-VLB (subconjunto
+Betza); verificación del ZRF cazauxchess.zip; consulta a Cazaux (repetición/50,
+lagunas [SUPUESTO]); publicación de las refs de perft en talkchess. Programado
+como verificación paralela, no como precondición de F1.
