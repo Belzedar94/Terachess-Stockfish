@@ -107,7 +107,7 @@ Convenciones: "desliza" = se detiene ante el primer ocupante (captura si es enem
 - Si `s1` está vacía: puede moverse a `s1`; y además desliza desde `s1` en las DOS direcciones ortogonales `(dx,0)` y `(0,dy)` (las componentes de `d`, alejándose del origen), con la regla normal de deslizamiento.
 El Eagle nunca salta y nunca vuelve hacia atrás. Total: 4 diagonales × (1 casilla + 2 rayos).
 
-**Rhinoceros**: simétrico: `d` ortogonal; desde `s1` desliza en las DOS diagonales que contienen a `d` como componente (para `d=(1,0)`: `(1,1)` y `(1,−1)`).
+**Rhinoceros**: simétrico completo: `d` ortogonal; si `s1=s+d` está ocupada por enemiga puede capturar en `s1`; si vacía, puede detenerse en `s1` o deslizar desde ella en las DOS diagonales que contienen a `d` como componente (para `d=(1,0)`: `(1,1)` y `(1,−1)`). En consecuencia el Rhinoceros ataca sus 4 casillas ortogonales adyacentes (y el Eagle sus 4 diagonales adyacentes).
 
 ### 4.2 Piezas con pantalla (Cannon / Archer / Sorceress) — semántica exacta
 
@@ -155,6 +155,10 @@ Al **alcanzar la última fila** (fila 16 para blancas, 1 para negras), la promoc
 | Troll | Queen — **solo si llega con paso de peón** (1 adelante o captura diagonal-adelante); si llega con salto de 3, NO promociona y queda como Troll |
 
 Ninguna otra pieza promociona. No hay más zona de promoción que la última fila.
+
+Precisiones **[SUPUESTO]** (lagunas del autor, resueltas 2026-07-19 al construir el oráculo; consulta abierta):
+- **Doble paso a la última fila** (posible porque §6.1 lo permite desde cualquier casilla): la pieza promociona inmediatamente (P→Q, Príncipe→Amazon) Y la casilla e.p. queda marcada igualmente; una captura al paso posterior retira la pieza YA promocionada del tablero ("as if it had only moved one square").
+- **Movimiento dentro de la última fila**: "alcanzar la última fila" = cualquier movimiento que TERMINA en ella; una pieza promocionable que se desplaza lateralmente por la última fila (solo alcanzable desde FEN artificial: en juego real la promoción al llegar es obligatoria) promociona al completar el movimiento. La excepción del Troll (por salto NO) se mantiene.
 
 ## 7. Final de partida
 
