@@ -356,6 +356,26 @@ pendiente label/eval esté en [0,8, 1,25] con correlación >0,9, sobre toda
 campaña y **antes** de entrenar. Validado contra los datos viejos: da FAIL con
 pendiente 0,263.
 
+### Apéndice: falsa alarma de "búsqueda rota" (sonda mal construida)
+
+Durante el diagnóstico, una prueba táctica rápida (`position … | go nodes 20000
+| quit` por tubería) devolvió **0 nodos y PV vacía en todas las posiciones,
+incluida la inicial**, y con todos los binarios, incluidos los que acababan de
+jugar partidas de 464 plies. Parecía un fallo gravísimo del motor.
+
+No lo era: al llegar todo el stdin de golpe, el `quit` aborta la búsqueda antes
+de que produzca nada. Las mediciones anteriores eran válidas porque el runner de
+partidas lee de forma **síncrona** hasta `bestmove`, y en los lotes de
+calibración cada `position` siguiente espera a que termine la búsqueda anterior
+(solo la última quedaba truncada).
+
+Repetida la prueba de forma síncrona, el motor **captura correctamente** la
+torre y la dama colgadas y encuentra el mate, tanto con eval material como con
+red. Registrado por la lección que confirma (Spell #6): *validar siempre el
+mecanismo de la sonda antes de creer su resultado*. Coste: 15 minutos; sin la
+comprobación habría sido una "corrección" de un bug inexistente sobre código
+correcto.
+
 **Learnings**: (1) un nombre de campo mentiroso heredado del upstream
 (`InternalUnits` conteniendo cp convertidos) costó una red y ~4 horas de CPU;
 (2) el gate de paridad ==0 cp verifica que dos implementaciones **coinciden**,
