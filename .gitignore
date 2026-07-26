@@ -13,3 +13,4 @@ data/*.bin*
 data/*.tnn
 data/*_ckpt/
 data/*.log
+nets/*.tnn
