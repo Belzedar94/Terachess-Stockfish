@@ -65,6 +65,11 @@ autopsias está en [AUDIT.md](AUDIT.md).
   0,975). Ambas se cazaron por incoherencia con mediciones ya validadas.
 - **Un gate que pasaba vacío**: `parity_gate` daba PASS con 0 posiciones cuando
   el volcado de referencia aún no existía. Corregido para fallar cerrado.
+- **Un SPRT que medía nada**: los primeros 160 partidas dieron **exactamente**
+  +20−20, +40−40, +60−60, +80−80. Esa simetría perfecta es imposible entre
+  motores distintos: `pkill` no había matado el proceso lanzado antes de añadir
+  soporte de opciones UCI, así que comparaba el motor consigo mismo sin red.
+  Se detectó por la implausibilidad estadística del resultado, no por un error.
 - **Un cap de 300 plies** fabricó un 100 % de tablas y estuve a punto de tomarlo
   por una propiedad del juego. Las partidas duran 575 plies de media.
 
