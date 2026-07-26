@@ -69,6 +69,21 @@ entrada dispersa (104448)  --FT-->  acc[256] i16   (por perspectiva)
    --fc0--> 16 --relu--> fc1 --> 32 --relu--> fc2 --> 1        (por output bucket)
 + PSQT[bucket] (i32, camino directo desde el FT)
 ```
+
+**Aclaración normativa (2026-07-19, resuelve una contradicción de la v1)**: el
+pairwise **reduce 512 → 256** (cada mitad del acumulador concatenado se
+multiplica con la otra), luego `FC0_IN = 256`. La tabla de §7 decía
+`fc0 i8[512×16]`, que era incompatible; **manda este párrafo**: `fc0` es
+`i8[256×16]`. Detectado por la verificación cruzada trainer↔contrato antes de
+que ninguna red se entrenara.
+
+**Combinación final y escala** (tampoco estaban definidas en la v1; convención
+Stockfish, obligatoria para ambos lados):
+```
+psqt      = (psqt_stm[bucket] - psqt_nstm[bucket]) / 2      // trunc hacia cero
+eval_cp   = (psqt + positional[bucket]) / FV_SCALE          // trunc hacia cero
+FV_SCALE  = 16
+```
 - `L1 = 256` por perspectiva.
 - **8 output buckets** por material: `bucket = min(7, (pieceCount - 1) / 16)`
   (128 piezas iniciales → bucket 7; finales → 0-1). Cada bucket tiene su propio
@@ -118,7 +133,7 @@ dims       u32×4 kingBuckets=8, planes=51, L1=256, outBuckets=8
 ft_weights i16[104448 × 256]
 ft_bias    i16[256]
 psqt       i32[104448 × 8]
-stacks     8 × (fc0 i8[512×16] + b i32[16] + fc1 i8[16×32] + b i32[32] + fc2 i8[32×1] + b i32[1])
+stacks     8 × (fc0 i8[256×16] + b i32[16] + fc1 i8[16×32] + b i32[32] + fc2 i8[32×1] + b i32[1])
 ```
 Descriptor canónico (texto exacto que se hashea):
 `terachess-nnue-S;kb=8;planes=51;sq=256;L1=256;ob=8;ftscale=128;act=clip0_127;pairwise=shr7;stack=16-32-1`
