@@ -27,12 +27,16 @@ namespace Stockfish {
 
 class Position;
 
-// F1 evaluation (frozen contract): material over the 26 Terachess piece
-// types (spec 8 values, stored in PieceTypeValue) plus a 20cp tempo bonus.
-// NNUE is out of the build entirely; F3 reintroduces it.
+// Evaluation. With a TNN1 network loaded (UCI option EvalFile, and UseNNUE
+// enabled) this is the NNUE "S" of docs/nnue-tera-s.md; otherwise it falls
+// back to the F1 material evaluation over the 26 Terachess piece types
+// (spec 8 values, stored in PieceTypeValue) plus a 20cp tempo bonus.
 namespace Eval {
 
 Value evaluate(const Position& pos);
+
+// Keeps a static evaluation inside the non-decisive score range.
+Value clamp_to_eval_range(Value v);
 
 std::string trace(Position& pos);
 

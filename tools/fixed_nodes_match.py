@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "oracle"))
 
 
 class Engine:
-    def __init__(self, path, name):
+    def __init__(self, path, name, options=None):
         self.path = path
         self.name = name
         self.p = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -28,6 +28,11 @@ class Engine:
         self.crashed = False
         self.send("uci")
         self.wait("uciok")
+        for opt in (options or []):
+            k, _, v = opt.partition("=")
+            self.send(f"setoption name {k.strip()} value {v.strip()}")
+        self.send("isready")
+        self.wait("readyok")
 
     def send(self, s):
         try:
@@ -119,6 +124,10 @@ def main():
     ap.add_argument("--rule50", type=int, default=0,
                     help="tablas si el contador de 50 llega a N jugadas (0 = off)")
     ap.add_argument("--seed", type=int, default=1234)
+    ap.add_argument("--a-opt", action="append", default=[],
+                    help="opcion UCI para A, formato Nombre=valor (repetible)")
+    ap.add_argument("--b-opt", action="append", default=[],
+                    help="opcion UCI para B, formato Nombre=valor (repetible)")
     ap.add_argument("--json")
     args = ap.parse_args()
 
@@ -126,8 +135,8 @@ def main():
     O = load_impl("a")
     rng = random.Random(args.seed)
 
-    A = Engine(args.a, "A")
-    B = Engine(args.b, "B")
+    A = Engine(args.a, "A", args.a_opt)
+    B = Engine(args.b, "B", args.b_opt)
     w = l = d = 0
     anomalies = []
     plies_total = 0

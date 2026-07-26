@@ -39,6 +39,7 @@
 #include "misc.h"
 #include "movegen.h"
 #include "movepick.h"
+#include "nnue/tera_network.h"
 #include "position.h"
 #include "thread.h"
 #include "timeman.h"
@@ -255,6 +256,8 @@ void Search::Worker::start_searching() {
 // repeatedly with increasing depth until the allocated thinking time has been
 // consumed, the user stops the search, or the maximum search depth is reached.
 bool Search::Worker::iterative_deepening() {
+
+    nnue_start_search();
 
     SearchManager* mainThread = (is_mainthread() ? main_manager() : nullptr);
 
@@ -632,6 +635,9 @@ void Search::Worker::do_move(
     DirtyPiece dirtyPiece;
     pos.do_move(move, st, givesCheck, dirtyPiece, &tt);
 
+    if (nnueActive)
+        accStack->push(TeraNNUE::network(), pos, dirtyPiece);
+
     if (ss != nullptr)
     {
         const int ps    = piece_slot(dirtyPiece.pc);
@@ -648,9 +654,31 @@ void Search::Worker::do_null_move(Position& pos, StateInfo& st, Stack* const ss)
     ss->continuationCorrectionHistory = &continuationCorrectionHistory[NO_PIECE][0];
 }
 
-void Search::Worker::undo_move(Position& pos, const Move move) { pos.undo_move(move); }
+void Search::Worker::undo_move(Position& pos, const Move move) {
+    pos.undo_move(move);
 
+    if (nnueActive)
+        accStack->pop();
+}
+
+// A null move leaves the board untouched, so the colour-indexed accumulator
+// stays valid as is: nothing to push, nothing to pop.
 void Search::Worker::undo_null_move(Position& pos) { pos.undo_null_move(); }
+
+// Called once per search, before the root is entered. Decides whether the
+// NNUE path is live for this search and seeds the accumulator from the root.
+void Search::Worker::nnue_start_search() {
+
+    nnueActive = TeraNNUE::active();
+
+    if (!nnueActive)
+        return;
+
+    if (!accStack)
+        accStack = std::make_unique<TeraNNUE::AccumulatorStack>();
+
+    accStack->reset(TeraNNUE::network(), rootPos);
+}
 
 
 // Reset histories, usually before a new game
@@ -1800,7 +1828,16 @@ TimePoint Search::Worker::elapsed() const {
     return main_manager()->tm.elapsed([this]() { return threads.nodes_searched(); });
 }
 
-Value Search::Worker::evaluate(const Position& pos) { return Eval::evaluate(pos); }
+Value Search::Worker::evaluate(const Position& pos) {
+
+    // Hot path: the accumulator on top of the stack already describes `pos`
+    // (it is maintained by do_move/undo_move), so only the forward pass runs.
+    if (nnueActive)
+        return Eval::clamp_to_eval_range(
+          Value(TeraNNUE::evaluate_accumulated(accStack->top(), pos).cp));
+
+    return Eval::evaluate(pos);
+}
 
 namespace {
 // Adjusts a mate or TB score from "plies to mate from the root" to

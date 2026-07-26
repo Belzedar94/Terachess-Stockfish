@@ -34,6 +34,7 @@
 #include "history.h"
 #include "misc.h"
 #include "movegen.h"
+#include "nnue/tera_accumulator.h"
 #include "numa.h"
 #include "position.h"
 #include "score.h"
@@ -400,6 +401,15 @@ class Worker {
     std::unique_ptr<ExtMove[]> movesArena;
     ExtMove*                   movesArenaTop = nullptr;
     std::unique_ptr<Move[]>    genScratch;
+
+    // NNUE feature-transformer accumulator, pushed/popped alongside
+    // do_move/undo_move. Allocated lazily: with no network loaded the whole
+    // NNUE path is inert and the search tree is bit-identical to the
+    // material-only engine.
+    std::unique_ptr<TeraNNUE::AccumulatorStack> accStack;
+    bool                                        nnueActive = false;
+
+    void nnue_start_search();
 
     // MovePickers claim slots RAII/LIFO from the bump arena — ply-keyed
     // slots would collide when a singular verification search re-enters

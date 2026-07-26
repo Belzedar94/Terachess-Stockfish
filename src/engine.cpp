@@ -32,6 +32,9 @@
 
 #include "evaluate.h"
 #include "misc.h"
+#include "nnue/tera_accumulator.h"
+#include "nnue/tera_features.h"
+#include "nnue/tera_network.h"
 #include "numa.h"
 #include "perft.h"
 #include "position.h"
@@ -110,6 +113,17 @@ Engine::Engine(std::optional<std::filesystem::path> path) :
                        Stockfish::Search::Skill::HighestElo));
 
     options.add("UCI_ShowWDL", Option(false));
+
+    // NNUE "S" (docs/nnue-tera-s.md). EvalFile is a path to a .tnn/.tnn1
+    // network; an empty value (the default) keeps the material evaluation.
+    options.add(  //
+      "EvalFile", Option("", [this](const Option& o) { return set_eval_file(o); }));
+
+    options.add(  //
+      "UseNNUE", Option(true, [](const Option& o) {
+          TeraNNUE::set_use_nnue(int(o) != 0);
+          return std::nullopt;
+      }));
 
     threads.clear();
     resize_threads();
@@ -225,6 +239,50 @@ void Engine::trace_eval() const {
     p.set(pos.fen(), &trace_states->back());
 
     sync_cout << "\n" << Eval::trace(p) << sync_endl;
+}
+
+// `features`: active feature rows per perspective (parity gate, section 8).
+void Engine::trace_features() const {
+    StateListPtr trace_states(new std::deque<StateInfo>(1));
+    Position     p;
+    p.set(pos.fen(), &trace_states->back());
+
+    sync_cout << TeraNNUE::trace_features(p) << sync_endl;
+}
+
+// `nnuecheck`: refresh (oracle) vs incremental update over a random game
+// played from the position currently set with `position ...`.
+void Engine::nnue_check(int plies, u64 seed) const {
+    sync_cout << TeraNNUE::selfcheck_random_game(TeraNNUE::network(), pos.fen(), plies, seed)
+              << sync_endl;
+}
+
+std::optional<std::string> Engine::set_eval_file(const std::string& path) {
+
+    wait_for_search_finished();
+
+    if (path.empty() || path == "<empty>" || path == "none")
+    {
+        TeraNNUE::network().unload();
+        return std::string("EvalFile: cleared, using the material evaluation");
+    }
+
+    std::string error, secondError;
+
+    if (TeraNNUE::network().load(path, error))
+        return std::string("EvalFile: loaded '" + path + "' (arch_hash "
+                           + TeraNNUE::descriptor_hash_hex() + ")");
+
+    // Second chance next to the binary, as Stockfish does for its own nets.
+    const std::string sideBySide = (binaryDirectory / path_from_utf8(path)).u8string();
+    if (sideBySide != path && TeraNNUE::network().load(sideBySide, secondError))
+        return std::string("EvalFile: loaded '" + sideBySide + "' (arch_hash "
+                           + TeraNNUE::descriptor_hash_hex() + ")");
+
+    // Fail closed: no adaptation, no partial load, material evaluation stays.
+    TeraNNUE::network().unload();
+    return std::string("EvalFile: REJECTED '" + path + "': " + error
+                       + " -- network NOT loaded, keeping the material evaluation");
 }
 
 const OptionsMap& Engine::get_options() const { return options; }

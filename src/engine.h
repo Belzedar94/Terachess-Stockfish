@@ -86,6 +86,11 @@ class Engine {
     // utility functions
 
     void trace_eval() const;
+    // NNUE debug hooks for the ==0 cp parity gate (contract section 8)
+    void trace_features() const;
+    void nnue_check(int plies, u64 seed) const;
+    // EvalFile handler: fails closed, keeps the material fallback on error
+    std::optional<std::string> set_eval_file(const std::string& path);
 
     const OptionsMap& get_options() const;
     OptionsMap&       get_options();

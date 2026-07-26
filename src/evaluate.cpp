@@ -22,6 +22,8 @@
 #include <cassert>
 #include <sstream>
 
+#include "nnue/tera_features.h"
+#include "nnue/tera_network.h"
 #include "position.h"
 #include "types.h"
 
@@ -39,36 +41,62 @@ Value material_imbalance(const Position& pos) {
          + PawnValue * (pos.count<PAWN>(WHITE) - pos.count<PAWN>(BLACK));
 }
 
+Value material_eval(const Position& pos) {
+    Value mat = material_imbalance(pos);
+    return (pos.side_to_move() == WHITE ? mat : -mat) + Tempo;
+}
+
 }  // namespace
 
-// Static evaluation, from the point of view of the side to move.
+// Keep the evaluation strictly inside the non-decisive score range.
+Value Eval::clamp_to_eval_range(Value v) {
+    return std::clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
+}
+
+// Static evaluation, from the point of view of the side to move. With a
+// network loaded this is the NNUE "S" output; the accumulator is rebuilt from
+// scratch here, so this entry point stays valid for any caller. The search
+// hot path uses its own incremental accumulator (Search::Worker::evaluate).
 Value Eval::evaluate(const Position& pos) {
 
     assert(!pos.checkers());
 
-    Value mat = material_imbalance(pos);
-    Value v   = (pos.side_to_move() == WHITE ? mat : -mat) + Tempo;
+    if (TeraNNUE::active())
+        return clamp_to_eval_range(Value(TeraNNUE::evaluate_position(pos).cp));
 
-    // Keep the evaluation strictly inside the non-decisive score range
-    return std::clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
+    return clamp_to_eval_range(material_eval(pos));
 }
 
-// Debug helper for the 'eval' UCI command. Scores from white's point of view.
+// Debug helper for the 'eval' UCI command. The four canonical lines
+// (psqt / positional / total_cp / bucket) are the parity-gate contract of
+// docs/nnue-tera-s.md section 8 and are always emitted, network or not.
+// All of them are exact integers from the side-to-move point of view; the
+// engine clamps total_cp into the non-decisive range only inside search().
 std::string Eval::trace(Position& pos) {
 
-    if (pos.checkers())
-        return "Final evaluation: none (in check)";
+    std::ostringstream ss;
 
-    std::stringstream ss;
-    Value             mat = material_imbalance(pos);
+    if (TeraNNUE::active())
+    {
+        const auto e = TeraNNUE::evaluate_position(pos);
 
-    ss << "Material (white side): " << mat << " internal units\n";
-    ss << "Tempo                : " << Tempo << " (to " << (pos.side_to_move() == WHITE ? "white" : "black")
-       << ")\n";
+        ss << "nnue " << TeraNNUE::network().file() << '\n';
+        ss << "psqt " << e.psqt << '\n';
+        ss << "positional " << e.positional << '\n';
+        ss << "total_cp " << e.cp << '\n';
+        ss << "bucket " << e.bucket;
+        return ss.str();
+    }
 
-    Value v = evaluate(pos);
-    v       = pos.side_to_move() == WHITE ? v : -v;
-    ss << "Final evaluation      : " << v << " (white side)";
+    const Value mat = material_imbalance(pos);
+
+    ss << "nnue none\n";
+    ss << "material " << mat << "  (white side, internal units)\n";
+    ss << "tempo " << Tempo << '\n';
+    ss << "psqt 0\n";
+    ss << "positional 0\n";
+    ss << "total_cp " << material_eval(pos) << '\n';
+    ss << "bucket " << TeraNNUE::output_bucket(pos);
 
     return ss.str();
 }

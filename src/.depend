@@ -3,13 +3,18 @@ benchmark.o: benchmark.cpp benchmark.h notation.h types.h misc.h tune.h \
 bitboard.o: bitboard.cpp bitboard.h types.h misc.h tune.h
 datagen.o: datagen.cpp datagen.h engine.h misc.h history.h memory.h \
  types.h tune.h position.h bitboard.h numa.h shm.h search.h movegen.h \
- score.h timeman.h thread.h thread_win32_osx.h tt.h ucioption.h \
- notation.h uci.h
-evaluate.o: evaluate.cpp evaluate.h types.h misc.h tune.h position.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h score.h timeman.h thread.h thread_win32_osx.h tt.h \
+ ucioption.h notation.h uci.h
+evaluate.o: evaluate.cpp evaluate.h types.h misc.h tune.h \
+ nnue/tera_features.h nnue/../types.h nnue/../tune.h nnue/tera_network.h \
+ nnue/../misc.h nnue/tera_accumulator.h nnue/tera_features.h position.h \
  bitboard.h
 main.o: main.cpp bitboard.h types.h misc.h tune.h position.h uci.h \
- engine.h history.h memory.h numa.h shm.h search.h movegen.h score.h \
- timeman.h thread.h thread_win32_osx.h tt.h ucioption.h notation.h
+ engine.h history.h memory.h numa.h shm.h search.h movegen.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h score.h timeman.h thread.h thread_win32_osx.h tt.h \
+ ucioption.h notation.h
 notation.o: notation.cpp notation.h types.h misc.h tune.h bitboard.h \
  position.h
 misc.o: misc.cpp misc.h types.h tune.h
@@ -20,29 +25,52 @@ movepick.o: movepick.cpp movepick.h history.h memory.h types.h misc.h \
 position.o: position.cpp position.h bitboard.h types.h misc.h tune.h \
  movegen.h notation.h tt.h memory.h
 search.o: search.cpp search.h history.h memory.h types.h misc.h tune.h \
- position.h bitboard.h movegen.h numa.h shm.h score.h timeman.h \
- evaluate.h movepick.h thread.h thread_win32_osx.h tt.h uci.h engine.h \
+ position.h bitboard.h movegen.h nnue/tera_accumulator.h nnue/../types.h \
+ nnue/../tune.h nnue/tera_features.h numa.h shm.h score.h timeman.h \
+ evaluate.h movepick.h nnue/tera_network.h nnue/../misc.h \
+ nnue/tera_accumulator.h thread.h thread_win32_osx.h tt.h uci.h engine.h \
  ucioption.h notation.h
 thread.o: thread.cpp thread.h memory.h types.h misc.h tune.h numa.h shm.h \
- position.h bitboard.h search.h history.h movegen.h score.h timeman.h \
- thread_win32_osx.h uci.h engine.h tt.h ucioption.h notation.h
+ position.h bitboard.h search.h history.h movegen.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h score.h timeman.h thread_win32_osx.h uci.h engine.h \
+ tt.h ucioption.h notation.h
 timeman.o: timeman.cpp timeman.h misc.h search.h history.h memory.h \
- types.h tune.h position.h bitboard.h movegen.h numa.h shm.h score.h \
+ types.h tune.h position.h bitboard.h movegen.h nnue/tera_accumulator.h \
+ nnue/../types.h nnue/../tune.h nnue/tera_features.h numa.h shm.h score.h \
  ucioption.h
 tt.o: tt.cpp tt.h misc.h memory.h types.h tune.h thread.h numa.h shm.h \
- position.h bitboard.h search.h history.h movegen.h score.h timeman.h \
- thread_win32_osx.h
+ position.h bitboard.h search.h history.h movegen.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h score.h timeman.h thread_win32_osx.h
 uci.o: uci.cpp uci.h engine.h misc.h history.h memory.h types.h tune.h \
- position.h bitboard.h numa.h shm.h search.h movegen.h score.h timeman.h \
- thread.h thread_win32_osx.h tt.h ucioption.h notation.h benchmark.h \
- datagen.h
+ position.h bitboard.h numa.h shm.h search.h movegen.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h score.h timeman.h thread.h thread_win32_osx.h tt.h \
+ ucioption.h notation.h benchmark.h datagen.h
 ucioption.o: ucioption.cpp ucioption.h misc.h
 tune.o: tune.cpp tune.h misc.h ucioption.h
 engine.o: engine.cpp engine.h misc.h history.h memory.h types.h tune.h \
- position.h bitboard.h numa.h shm.h search.h movegen.h score.h timeman.h \
- thread.h thread_win32_osx.h tt.h ucioption.h evaluate.h perft.h \
- notation.h uci.h
+ position.h bitboard.h numa.h shm.h search.h movegen.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h score.h timeman.h thread.h thread_win32_osx.h tt.h \
+ ucioption.h evaluate.h nnue/tera_features.h nnue/tera_network.h \
+ nnue/../misc.h nnue/tera_accumulator.h perft.h notation.h uci.h
 score.o: score.cpp score.h types.h misc.h tune.h uci.h engine.h history.h \
- memory.h position.h bitboard.h numa.h shm.h search.h movegen.h timeman.h \
- thread.h thread_win32_osx.h tt.h ucioption.h notation.h
+ memory.h position.h bitboard.h numa.h shm.h search.h movegen.h \
+ nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
+ nnue/tera_features.h timeman.h thread.h thread_win32_osx.h tt.h \
+ ucioption.h notation.h
 memory.o: memory.cpp memory.h types.h misc.h tune.h
+tera_features.o: nnue/tera_features.cpp nnue/tera_features.h \
+ nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/../bitboard.h \
+ nnue/../types.h nnue/../position.h nnue/../bitboard.h
+tera_accumulator.o: nnue/tera_accumulator.cpp nnue/tera_accumulator.h \
+ nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/tera_features.h \
+ nnue/../bitboard.h nnue/../types.h nnue/../misc.h nnue/../movegen.h \
+ nnue/../notation.h nnue/../position.h nnue/../bitboard.h \
+ nnue/tera_network.h
+tera_network.o: nnue/tera_network.cpp nnue/tera_network.h nnue/../misc.h \
+ nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/tera_accumulator.h \
+ nnue/tera_features.h nnue/../memory.h nnue/../types.h nnue/../position.h \
+ nnue/../bitboard.h

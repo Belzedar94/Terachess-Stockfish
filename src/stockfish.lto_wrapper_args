@@ -20,3 +20,6 @@ tune.o
 engine.o
 score.o
 memory.o
+tera_features.o
+tera_accumulator.o
+tera_network.o

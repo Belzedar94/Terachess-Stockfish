@@ -157,6 +157,10 @@ void UCIEngine::loop() {
             sync_cout << engine.visualize() << sync_endl;
         else if (token == "eval")
             engine.trace_eval();
+        else if (token == "features")
+            engine.trace_features();
+        else if (token == "nnuecheck")
+            nnuecheck(is);
         else if (token == "compiler")
             sync_cout << compiler_info() << sync_endl;
         else if (token == "--help" || token == "help" || token == "--license" || token == "license")
@@ -474,6 +478,20 @@ void UCIEngine::datagen(std::istream& args) {
     std::string error;
     if (!Datagen::run(args, binaryPath, error))
         terminate_on_critical_error("datagen: " + error);
+}
+
+// `nnuecheck [plies] [seed]`: plays a random legal game and verifies, after
+// every ply, that the incremental accumulator equals a full refresh.
+void UCIEngine::nnuecheck(std::istream& args) {
+    engine.wait_for_search_finished();
+
+    int plies = 300;
+    u64 seed  = 20260726;
+
+    args >> plies;
+    args >> seed;
+
+    engine.nnue_check(plies, seed);
 }
 
 u64 UCIEngine::perft(const Search::LimitsType& limits) {

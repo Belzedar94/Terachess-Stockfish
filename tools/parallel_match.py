@@ -38,6 +38,10 @@ def worker(args, idx, games, seed):
         cmd += ["--adj-cp", str(args.adj_cp), "--adj-moves", str(args.adj_moves)]
     if args.rule50:
         cmd += ["--rule50", str(args.rule50)]
+    for o in args.a_opt:
+        cmd += ["--a-opt", o]
+    for o in args.b_opt:
+        cmd += ["--b-opt", o]
     subprocess.run(cmd, capture_output=True, text=True)
     try:
         with open(tmp, encoding="utf-8") as f:
@@ -60,6 +64,8 @@ def main():
     ap.add_argument("--adj-moves", type=int, default=6)
     ap.add_argument("--rule50", type=int, default=100)
     ap.add_argument("--seed", type=int, default=9000)
+    ap.add_argument("--a-opt", action="append", default=[])
+    ap.add_argument("--b-opt", action="append", default=[])
     ap.add_argument("--json")
     args = ap.parse_args()
 
