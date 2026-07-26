@@ -54,16 +54,34 @@ class Engine:
         self.wait("readyok")
 
     def bestmove(self, start_fen, moves, nodes):
+        """Devuelve (move, score_cp_pov_stm). score None si no se pudo leer."""
         cmd = f"position fen {start_fen}"
         if moves:
             cmd += " moves " + " ".join(moves)
         self.send(cmd)
         self.send(f"go nodes {nodes}")
-        line = self.wait("bestmove")
-        if line is None:
-            return None
-        parts = line.split()
-        return parts[1] if len(parts) > 1 else None
+        score = None
+        t0 = time.time()
+        while time.time() - t0 < 180:
+            line = self.p.stdout.readline()
+            if not line:
+                self.crashed = True
+                return None, None
+            if line.startswith("info ") and " score " in line:
+                parts = line.split()
+                try:
+                    if "cp" in parts:
+                        score = int(parts[parts.index("cp") + 1])
+                    elif "mate" in parts:
+                        m = int(parts[parts.index("mate") + 1])
+                        score = 30000 - abs(m) if m > 0 else -(30000 - abs(m))
+                except (ValueError, IndexError):
+                    pass
+            elif line.startswith("bestmove"):
+                parts = line.split()
+                return (parts[1] if len(parts) > 1 else None), score
+        self.crashed = True
+        return None, None
 
     def close(self):
         self.send("quit")
@@ -95,6 +113,11 @@ def main():
     ap.add_argument("--nodes", type=int, default=20000)
     ap.add_argument("--max-plies", type=int, default=400)
     ap.add_argument("--open-plies", type=int, default=8)
+    ap.add_argument("--adj-cp", type=int, default=0,
+                    help="adjudicar victoria si |eval| >= cp durante adj-moves jugadas (0 = off)")
+    ap.add_argument("--adj-moves", type=int, default=4)
+    ap.add_argument("--rule50", type=int, default=0,
+                    help="tablas si el contador de 50 llega a N jugadas (0 = off)")
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--json")
     args = ap.parse_args()
@@ -130,15 +153,20 @@ def main():
             pos = pos.apply(mv)
         moves = list(saved_opening)
         result, winner = None, None
+        adj_streak_white = adj_streak_black = 0
 
         for ply in range(args.max_plies):
             legal = pos.legal_moves()
             if not legal:
                 result = pos.result()
                 break
-            white_to_move = pos.to_fen().split()[1] == "w"
+            fen_parts = pos.to_fen().split()
+            white_to_move = fen_parts[1] == "w"
+            if args.rule50 and int(fen_parts[4]) >= 2 * args.rule50:
+                result = "1/2-1/2"
+                break
             eng = A if (white_to_move == a_is_white) else B
-            mv = eng.bestmove(O.START_FEN, moves, args.nodes)
+            mv, score = eng.bestmove(O.START_FEN, moves, args.nodes)
             if eng.crashed or mv is None or mv not in legal:
                 anomalies.append({"game": g, "engine": eng.name, "ply": ply,
                                   "move": mv, "crashed": eng.crashed,
@@ -146,6 +174,25 @@ def main():
                 winner = "B" if eng is A else "A"
                 result = "anomaly"
                 break
+            # adjudicacion por evaluacion (win_adj movecount/score del plan)
+            if args.adj_cp and score is not None:
+                white_score = score if white_to_move else -score
+                if white_score >= args.adj_cp:
+                    adj_streak_white += 1
+                    adj_streak_black = 0
+                elif white_score <= -args.adj_cp:
+                    adj_streak_black += 1
+                    adj_streak_white = 0
+                else:
+                    adj_streak_white = adj_streak_black = 0
+                if adj_streak_white >= args.adj_moves:
+                    result, adjudicated = "1-0", True
+                    moves.append(mv); plies_total += 1
+                    break
+                if adj_streak_black >= args.adj_moves:
+                    result, adjudicated = "0-1", True
+                    moves.append(mv); plies_total += 1
+                    break
             moves.append(mv)
             pos = pos.apply(mv)
             plies_total += 1
