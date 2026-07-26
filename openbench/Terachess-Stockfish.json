@@ -1,0 +1,61 @@
+{
+ "private": true,
+ "nps": 400000,
+ "source": "https://github.com/local/Terachess-Stockfish",
+ "build": {
+  "path": "src",
+  "compilers": [
+   "g++"
+  ],
+  "cpuflags": [
+   "POPCNT",
+   "AVX2",
+   "BMI2"
+  ],
+  "systems": [
+   "Windows",
+   "Linux"
+  ]
+ },
+ "test_presets": {
+  "default": {
+   "base_branch": "main",
+   "book_name": "tera_openings_v1.epd",
+   "test_bounds": "[1.00, 6.00]",
+   "test_confidence": "[0.05, 0.05]",
+   "win_adj": "movecount=6 score=5000",
+   "draw_adj": "None"
+  },
+  "STC": {
+   "both_options": "Threads=1 Hash=16",
+   "both_time_control": "60.0+0.6",
+   "workload_size": 8
+  },
+  "LTC": {
+   "both_options": "Threads=1 Hash=64",
+   "both_time_control": "180.0+1.8",
+   "workload_size": 2
+  },
+  "FIXED NODES": {
+   "both_options": "Threads=1 Hash=16",
+   "both_time_control": "N=10000",
+   "workload_size": 16
+  }
+ },
+ "datagen_presets": {
+  "default": {
+   "book_name": "tera_openings_v1.epd",
+   "datagen_command": "datagen book {BOOK} nodes 12000 count {COUNT} threads {THREADS} seed {SEED} out {OUT}",
+   "datagen_total_count": 2000000,
+   "datagen_positions_per_chunk": 20000,
+   "datagen_base_seed": 20260726
+  },
+  "25k nodes": {
+   "book_name": "tera_openings_v1.epd",
+   "datagen_command": "datagen book {BOOK} nodes 25000 count {COUNT} threads {THREADS} seed {SEED} out {OUT}",
+   "datagen_total_count": 20000000,
+   "datagen_positions_per_chunk": 10000,
+   "datagen_base_seed": 20260801
+  }
+ }
+}
