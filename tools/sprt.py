@@ -62,6 +62,9 @@ def main():
     r.add_argument("--batch", type=int, default=20, help="partidas por lote")
     r.add_argument("--max-plies", type=int, default=300)
     r.add_argument("--seed", type=int, default=4242)
+    r.add_argument("--a-opt", action="append", default=[])
+    r.add_argument("--b-opt", action="append", default=[])
+    r.add_argument("--concurrency", type=int, default=4)
     r.add_argument("--json")
 
     c = sub.add_parser("calibrate")
@@ -116,10 +119,15 @@ def main():
     while played < args.max_games:
         n = min(args.batch, args.max_games - played)
         tmp = os.path.join(HERE, f".sprt_batch_{seed}.json")
-        cmd = [sys.executable, os.path.join(HERE, "fixed_nodes_match.py"),
+        cmd = [sys.executable, os.path.join(HERE, "parallel_match.py"),
                "--a", args.a, "--b", args.b, "--games", str(n),
                "--nodes", str(args.nodes), "--max-plies", str(args.max_plies),
+               "--concurrency", str(args.concurrency),
                "--seed", str(seed), "--json", tmp]
+        for o in args.a_opt:
+            cmd += ["--a-opt", o]
+        for o in args.b_opt:
+            cmd += ["--b-opt", o]
         subprocess.run(cmd, capture_output=True, text=True)
         try:
             with open(tmp, encoding="utf-8") as f:

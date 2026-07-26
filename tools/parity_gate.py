@@ -95,10 +95,17 @@ def main():
     ap.add_argument("--ref", required=True)
     ap.add_argument("--json")
     ap.add_argument("--no-features", action="store_true")
+    ap.add_argument("--min-positions", type=int, default=100,
+                    help="minimo de posiciones en la referencia; por debajo, ERROR")
     args = ap.parse_args()
 
     t0 = time.time()
     ref = load_ref(args.ref)
+    # Un gate que pasa sin posiciones no es un gate: falla cerrado.
+    if len(ref) < args.min_positions:
+        print(f"GATE DE PARIDAD: ERROR — la referencia tiene {len(ref)} posiciones "
+              f"y se exigen >= {args.min_positions}. ¿Terminó parity_harness?")
+        return 2
     print(f"referencia: {len(ref)} posiciones | buckets "
           f"{sorted({r['bucket'] for r in ref})}")
     fens = [r["fen"] for r in ref]
