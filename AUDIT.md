@@ -182,3 +182,57 @@ superado.**
 **Learnings**: la disciplina del playbook (auditar ANTES de medir) se pagó sola
 en la primera hora: sin ella habríamos calibrado el datagen entero sobre una
 métrica que medía el eco de su propia evaluación.
+
+---
+
+## 2026-07-19 — F2a bis: longitud de partida (dato fundacional de la variante)
+
+**Hipótesis**: Terachess con eval material es demasiado tablero para producir
+partidas decisivas; habrá que adjudicar por evaluación.
+
+**Refutada por la medida.** Piloto de 6 partidas a 10 k nodos con cap de 1.200
+plies: **media 575 plies, 6/6 decisivas por MATE real, 0 tablas**, ~18 s por
+partida. La tabla completa está en `docs/search-audit.md` §3bis.
+
+El error estaba en mi propia sonda: con cap de 300 plies medí 100 % de tablas y
+estuve a punto de tomarlo por una propiedad del juego. Era un artefacto del cap.
+Regla operativa nueva: **cap ≥1.000 plies en toda sonda, SPRT y datagen**.
+
+Consecuencias: bounds SPRT [1, 6] confirmados (tasa de tablas baja ⇒ cada
+partida informa ~2× que una de ajedrez); ~1 h por SPRT de 5.000 partidas con 24
+hilos; la adjudicación queda como red de seguridad (|eval| ≥5.000 cp × 6), no
+como mecanismo necesario.
+
+---
+
+## 2026-07-19 — GATE FASE 2 (datagen): PASS (commit b78036e)
+
+**Hipótesis**: el patrón run7 (shards + merge verificado + resume idempotente)
+es clonable sobre el formato tera-bin v1 y alcanza el umbral de viabilidad de
+≥60 pos/s agregadas con 24 hilos.
+
+**Evidencia**:
+- Comando UCI de una línea conforme al contrato OpenBench; exit 0 y un único
+  archivo final.
+- Tamaño exacto `32 + 144·N`; `audit_terabin.py --strict` exit 0 (tasa de
+  escritura 52,3 %, WDL 41,2/19,9/39,0, 0 registros sin resultado).
+- **Round-trip doble 200/200**: `to_fen(unpack(raw))` idéntico al FEN del motor
+  y `pack(unpack(raw)) == raw` byte a byte.
+- **Determinismo**: sha256 idéntico en 3 corridas y 2 recompilaciones.
+- **Resume real** (kill + relaunch): 4 shards reparados, 2.804 registros
+  supervivientes adoptados, streams splitmix disjuntos, merge verificado,
+  auditoría estricta y round-trip 150/150 tras la reanudación.
+- **Piloto**: 24 hilos, 25 k nodos → **88,57 pos/s agregadas** (3,69 por hilo).
+  Gate ≥60 → **PASS**.
+
+**Corrección aplicada tras el piloto**: `MaxGamePlies` 600 → 1.400. Con la
+media medida de 575 plies, el cap de 600 truncaba ~29 % de las partidas en
+tablas artificiales y envenenaba las etiquetas WDL — el mismo error que cometí
+en mi sonda, detectado aquí por triangulación entre dos mediciones
+independientes.
+
+**Decisión**: campaña 1 lanzada con 12 k nodos y 20 hilos (2 M registros,
+~174 pos/s reales). Es una campaña **de escala piloto**: su objetivo es cerrar
+la cadena datagen→trainer→red→gate de principio a fin, no producir la red
+definitiva. La campaña de régimen (20–30 M) queda para cuando la cadena esté
+verificada.
