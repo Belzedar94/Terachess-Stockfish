@@ -1,0 +1,16 @@
+{
+ "verdict": "PASS",
+ "games": 360,
+ "w": 268,
+ "l": 91,
+ "d": 1,
+ "llr": 3.302,
+ "bounds_elo": [
+  1.0,
+  6.0
+ ],
+ "alpha": 0.05,
+ "beta": 0.05,
+ "nodes": 8000,
+ "seconds": 570.8
+}

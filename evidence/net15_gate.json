@@ -1,0 +1,15 @@
+{
+ "a": "../src/stockfish.exe",
+ "b": "../src/stockfish.exe",
+ "nodes": 10000,
+ "games": 100,
+ "w": 87,
+ "l": 13,
+ "d": 0,
+ "draw_rate_pct": 0.0,
+ "mean_plies": 395.5,
+ "elo": 330.2,
+ "elo_err": 51.7,
+ "anomalies": 0,
+ "seconds": 1280.7
+}
