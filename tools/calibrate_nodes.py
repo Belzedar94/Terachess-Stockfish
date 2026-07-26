@@ -16,8 +16,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "oracle"))
 
 
-def uci_batch(engine, script, threads=1, timeout=36000):
-    pre = f"setoption name Threads value {threads}\nuci\nisready\n"
+def uci_batch(engine, script, threads=1, timeout=36000, net=None):
+    pre = f"setoption name Threads value {threads}\n"
+    if net:
+        pre += f"setoption name EvalFile value {net}\n"
+    pre += "uci\nisready\n"
     out = subprocess.run([engine], input=pre + script + "\nquit\n",
                          capture_output=True, text=True, timeout=timeout).stdout
     return out
@@ -74,6 +77,7 @@ def main():
     ap.add_argument("--nodes", default="10000,20000,40000,80000")
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--seed", type=int, default=99)
+    ap.add_argument("--net", help="TNN1 a cargar (calibracion con red)")
     ap.add_argument("--out", default=os.path.join(HERE, "calibration.json"))
     args = ap.parse_args()
 
@@ -86,15 +90,15 @@ def main():
         t0 = time.time()
         # 1) busqueda a N nodos
         script = "\n".join(f"position fen {f}\ngo nodes {N}" for f in fens)
-        base = parse_searches(uci_batch(args.engine, script, args.threads))
+        base = parse_searches(uci_batch(args.engine, script, args.threads, net=args.net))
         # 2) arbitro a 4N nodos: score del arbitro para SU mejor jugada
         script4 = "\n".join(f"position fen {f}\ngo nodes {4*N}" for f in fens)
-        ref = parse_searches(uci_batch(args.engine, script4, args.threads))
+        ref = parse_searches(uci_batch(args.engine, script4, args.threads, net=args.net))
         # 3) score del arbitro para la jugada del nivel N (searchmoves)
         script_sm = "\n".join(
             f"position fen {f}\ngo nodes {4*N} searchmoves {b['best']}"
             for f, b in zip(fens, base) if b.get("best") not in (None, "(none)"))
-        forced = parse_searches(uci_batch(args.engine, script_sm, args.threads))
+        forced = parse_searches(uci_batch(args.engine, script_sm, args.threads, net=args.net))
 
         depths = [b.get("depth", 0) for b in base]
         blunders, deltas = 0, []

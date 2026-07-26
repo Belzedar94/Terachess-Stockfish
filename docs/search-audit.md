@@ -104,13 +104,30 @@ delta medio 3,7–9,6 cp. **No me lo creo, y no debe usarse tal cual**:
 
 **Decisión**: la regla predeclarada del plan ("mínimo N con blunder <15 % y
 depth ≥5") **no puede resolverse con eval material**. Se sustituye por:
-- **F2 (ahora)**: nodos de datagen fijados por presupuesto de tiempo real
-  (pos/s medidas) y por el punto de rendimientos decrecientes del delta medio
-  → **25.000 nodos** (delta medio ya <10 cp, coste asumible).
+- **F2 (entonces)**: nodos de datagen fijados por presupuesto de tiempo real
+  (pos/s medidas) y por el punto de rendimientos decrecientes del delta medio.
 - **F3b (tras net-1)**: re-ejecutar la calibración con la red S cargada, donde
-  el árbitro sí aporta información independiente, y ajustar los nodos de la
-  campaña 2 con la regla original.
-Registrado como deuda técnica explícita, no como gate superado.
+  el árbitro sí aporta información independiente.
+
+### DEUDA CERRADA (2026-07-19, con net-1 cargada)
+
+`calibrate_nodes.py --net tera-net1.tnn`, 30 posiciones:
+
+| nodos | depth media | blunder-rate | delta medio |
+|---|---|---|---|
+| 10.000 | 9,40 | **6,7 %** | 22,4 cp |
+| 20.000 | 10,77 | 0,0 % | 5,1 cp |
+| 40.000 | 12,03 | 0,0 % | 6,7 cp |
+
+Ahora la métrica **sí discrimina** (6,7 % → 0 %, delta 22,4 → 5,1 cp), porque el
+árbitro a 4N nodos evalúa con una función aprendida y no con el mismo material
+del que se derivaba la jugada. Comparar con la tabla contaminada de arriba
+(0 % / 2,5 % / 0 % sin señal) muestra exactamente qué aportaba la red.
+
+**Regla aplicada**: mínimo N con blunder <15 % y depth ≥5 ⇒ **10.000 nodos**.
+Valida a posteriori los 8.000–12.000 usados en las campañas 2 y 3.
+La depth reportada (9,4–12,0) sigue inflada por el LMP chess-tuned (§2): no debe
+leerse como profundidad efectiva.
 
 ---
 
