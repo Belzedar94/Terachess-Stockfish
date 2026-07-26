@@ -37,9 +37,17 @@ comportamiento de ajedrez en su rango de validez y se elimina la extensión.
 El 40 es un tope conservador, NO un valor afinado: queda como knob para SPSA en
 F5 (presupuesto de familia: 1 toggle ya gastado aquí, dosis pendiente).
 
-**Evidencia del cambio**: sonda A/B a nodos fijos (`tools/fixed_nodes_match.py`,
-oráculo como árbitro) — resultados en AUDIT.md. Firma de bench: 22.723 → 21.519
-(árbol distinto, como debe ser).
+**Evidencia del cambio**: sonda A/B a nodos fijos, 80 partidas a 10 k nodos con
+cap de 1.000 plies (`tools/fixed_nodes_match.py`, oráculo como árbitro):
+**+41 −39 =0, Elo +8,7 ± 38,9, 0 anomalías, 464,7 plies de media**.
+Firma de bench: 22.723 → 21.519 (árbol distinto, como debe ser).
+
+**Lectura honesta**: el resultado es **INCONCLUSO en Elo** — la barra de error
+(±39) es cuatro veces el efecto medido. La corrección NO está justificada por
+ganancia demostrada, sino por **corrección matemática**: extender 4,7 plies los
+movimientos tardíos es indefendible en cualquier árbol, y la sonda descarta una
+regresión grande. Resolver ±10 Elo exigiría varios miles de partidas; queda como
+candidato a SPRT formal en F4/F5 junto con la dosis del tope (40).
 
 **Riesgo residual**: el tope 40 es arbitrario; puede que el óptimo escale con el
 branching real de cada nodo (p. ej. `min(mn, 40)` vs `mn · 40/movesGenerated`).

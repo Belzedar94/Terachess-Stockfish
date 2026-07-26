@@ -236,3 +236,29 @@ independientes.
 la cadena datagen→trainer→red→gate de principio a fin, no producir la red
 definitiva. La campaña de régimen (20–30 M) queda para cuando la cadena esté
 verificada.
+
+---
+
+## 2026-07-19 — SONDA #1 lmr-cap-40: INCONCLUSA (se conserva por corrección)
+
+| id | knob | partidas | W/L/D | Elo | veredicto | espacio/presupuesto |
+|---|---|---|---|---|---|---|
+| #1 | `r -= min(moveCount,40)*62` vs `moveCount*62` | 80 @10k nodos | +41 −39 =0 | +8,7 ± 38,9 | **INCONCLUSO** | 1 punto / familia abierta, presupuesto 4 SPRT |
+
+**Autopsia**: la barra de error es 4× el efecto. La sonda descarta una regresión
+grande, no demuestra ganancia. **Se conserva el cambio igualmente** porque su
+justificación no es empírica sino matemática: la fórmula original extendía 4,7
+plies los movimientos tardíos (ver `docs/search-audit.md` §1), lo cual es
+indefendible en cualquier árbol. Resolver ±10 Elo exige miles de partidas.
+Pendiente para F4/F5: SPRT formal del toggle + barrido de la dosis del tope
+(20/40/60/dinámico según legales).
+
+**Subproducto valioso**: **0 tablas en 80 partidas** (media 464,7 plies, 0
+anomalías, 0 jugadas ilegales en ~37.000 plies arbitrados por el oráculo).
+Con 0/80, el intervalo de confianza al 95 % sitúa la tasa de tablas por debajo
+del 3,7 % — aún mejor que el 4 % de Spell. Confirma bounds [1, 6] y hace el
+SPRT muy eficiente en esta variante.
+
+**Limitación operativa detectada**: el runner de partidas es secuencial (23 s
+por partida) ⇒ un SPRT de 5.000 partidas serían ~32 h. Necesita paralelismo
+antes de F4; anotado como tarea.

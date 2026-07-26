@@ -1,0 +1,15 @@
+{
+ "a": "../cand_lmrfix.exe",
+ "b": "../baseline_lmrbug.exe",
+ "nodes": 10000,
+ "games": 80,
+ "w": 41,
+ "l": 39,
+ "d": 0,
+ "draw_rate_pct": 0.0,
+ "mean_plies": 464.7,
+ "elo": 8.7,
+ "elo_err": 38.9,
+ "anomalies": [],
+ "seconds": 1864.8
+}
