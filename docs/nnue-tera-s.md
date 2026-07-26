@@ -90,6 +90,27 @@ FV_SCALE  = 16
   stack fc0/fc1/fc2 y su columna PSQT. Auditoría obligatoria del dataset: si un
   bucket queda por debajo del 5 % de los registros, se fusiona ANTES de
   entrenar (`min(5, …)`) y se documenta.
+
+**Medición real (campaña 1, muestra de 16.607 registros, 2026-07-19)**:
+
+| bucket | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| % del dataset | 0,2 | 3,0 | 8,1 | 12,7 | 14,6 | 15,7 | 16,3 | 29,4 |
+
+Los buckets 0 y 1 (finales de ≤32 piezas) están **por debajo del 5 %** que
+exige la regla. Con 2 M registros el bucket 0 recibiría ~4.200 muestras para un
+stack de ~4.640 pesos: infra-entrenado.
+
+**DESVIACIÓN DECLARADA (net-1)**: se mantiene la arquitectura de 8 buckets para
+la red piloto en lugar de fusionar. Motivo: el bucket lo calcula el motor de
+forma independiente, así que una remapeo solo en el trainer rompería el gate de
+paridad, y cambiar la arquitectura con dos implementaciones ya escritas contra
+el contrato congelado destruiría su coherencia. El objetivo de net-1 es cerrar
+la cadena, no maximizar fuerza. **Programado para net-2**: fusionar 0-1-2 en uno
+(`bucket = max(2, min(7, (n-1)/16)) - 2`, 6 buckets, todos ≥8 %), con
+`arch_hash` nuevo y re-verificación de paridad. No es una relajación del umbral
+tras ver un resultado: el umbral sigue vigente y se aplicará en la siguiente
+arquitectura; lo que se difiere es el rediseño, con la deuda anotada.
 - `eval_cp = (psqt[bucket] + positional[bucket]) / FV_SCALE`.
 
 ## 5. Cuantización — la garantía anti-overflow
