@@ -15,11 +15,13 @@ variante: las de este repositorio (`oracle/perft_refs.json`) son originales.
 | **F1** | Port a 256 casillas (Bitboard256, Move u32, ray-scan, 26 piezas) | **PASS** — 1.000 posiciones / 37,4 M nodos hoja sin discrepancias |
 | **F2** | Auditoría de búsqueda (bug de LMR corregido) + datagen embebido tera-bin v1 | **PASS** — 88,6 pos/s agregadas con 24 hilos |
 | **F3** | NNUE red S: trainer, lado motor, paridad ==0 cp y net-1 | **PASS** — paridad 0 cp / 1.200 posiciones; **net-1 +330,2 ± 51,7 Elo** vs material (umbral +100) |
-| **F4** | Calibración estadística propia + net-2 | net-2 entrenada (2,87 M registros, paridad 0 cp); SPRT vs net-1 en curso |
+| **F4** | Calibración estadística propia + net-2 | **PASS** — SPRT [1,6]: net-2 vs net-1 **+268 −91 =1, LLR +3,30 (~+187 Elo)** |
 | **F5** | Programa de mejora continua con presupuestos declarados | documentado (`docs/staging-program.md`) |
 
-**Red actual**: `tera-net1.tnn` (56,9 MB, sha256 `6bb5cd48…`), 8 king-buckets,
-L1=256, 8 output buckets. Entrenada con 1.522.654 posiciones de self-play.
+**Red actual**: `tera-net2.tnn` (56,9 MB, sha256 `05162b61…`), 8 king-buckets,
+L1=256, 8 output buckets, entrenada con 2.868.384 posiciones de self-play.
+Supera a `tera-net1.tnn` por ~187 Elo (SPRT PASS) y a la evaluación material por
+más de 400 Elo acumulados.
 
 ## Estructura
 

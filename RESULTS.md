@@ -12,7 +12,7 @@ autopsias está en [AUDIT.md](AUDIT.md).
 | **F1** | Port 256 correcto | **1.000 posiciones / 37.371.980 nodos hoja**, motor vs oráculo, **0 discrepancias**; perft startpos 54 / 2.916 / 175.508 / 10.562.564; bench determinista ×3 |
 | **F2** | Datagen viable + búsqueda auditada | **88,6 pos/s** agregadas (24 hilos, umbral ≥60); round-trip doble 200/200 byte-exacto; determinismo sha256 ×3; resume con kill/relaunch real; auditoría de búsqueda con 1 bug corregido |
 | **F3** | Paridad ==0 cp + red > material | **0 cp en 1.200 posiciones** estratificadas; **net-1: +330,2 ± 51,7 Elo** vs material (umbral +100) |
-| **F4** | Calibración propia + net-2 | 246 partidas con **0 tablas** (IC95 <1,2 %); bounds [1,6] justificados; net-2 entrenada y con paridad 0 cp; SPRT net-2 vs net-1 ejecutado |
+| **F4** | Calibración propia + net-2 | **PASS** — 606 partidas con 1 tabla; bounds [1,6] declarados antes; **SPRT net-2 > net-1: +268 −91 =1, LLR +3,30 (~+187 Elo)** |
 | **F5** | Programa con presupuestos | 7 familias priorizadas con arnés offline obligatorio y condición de salida |
 
 ## Lo que se construyó

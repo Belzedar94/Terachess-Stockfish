@@ -378,6 +378,33 @@ correcto.
 
 ---
 
+## 2026-07-19 — **GATE FASE 4: PASS** — SPRT #2 net-2 > net-1
+
+| id | candidato | base | partidas | W/L/D | Elo | LLR | bounds | veredicto |
+|---|---|---|---|---|---|---|---|---|
+| #2 | tera-net2 (2.868.384 registros) | tera-net1 (1.522.654) | 360 @8k nodos | +268 −91 =1 | **+187,0** | **+3,30** | [1, 6] α=β=0,05 | **PASS** |
+
+Bounds declarados **antes** de lanzar, conforme a la política. Cruce del umbral
+(+2,94) a las 360 partidas en 571 s con 12 procesos — coherente con el coste
+estimado en `docs/statistics.md`. Tasa de tablas 1/360 = 0,3 %, confirmando de
+nuevo el carácter decisivo de la variante.
+
+Calidad medida de net-2 frente a net-1 (posiciones frescas del oráculo):
+correlación con material 0,942 vs 0,937; error mediano **100 cp vs 133**;
+dispersión 528 vs 489 (material: 548). Paridad motor↔python **0 cp** en 300
+posiciones. sha256 `05162b618577fd28…`.
+
+**Incidente de instrumentación (registrado por instructivo)**: los primeros 160
+partidas de este SPRT dieron **exactamente** +20−20, +40−40, +60−60, +80−80.
+Esa simetría perfecta es imposible entre motores distintos: `pkill` no había
+matado el proceso lanzado antes de que `sprt.py` soportara opciones UCI, de modo
+que se estaba comparando el motor **consigo mismo** sin red. Detectado por
+implausibilidad estadística del propio resultado, no por un error visible.
+Tercera sonda defectuosa de la sesión; refuerza la regla: **un resultado
+demasiado limpio es sospechoso**.
+
+---
+
 ## 2026-07-19 — **GATE FASE 3: PASS** — net-1 gana +330 Elo al material
 
 | red | datos | partidas | W/L/D | Elo | paridad | veredicto |
