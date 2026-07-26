@@ -15,6 +15,9 @@ profile-build está prohibido en esta máquina hasta que se demuestre lo contrar
 |---|---|---|---|---|---|
 | 2026-07-19 | 72bfb25 | `bench` (ajedrez, depth default) | 2.692.515 | ~1.380.000 | Chasis SF master limpio, eval material fallback. Firma de AJEDREZ, no comparable con las siguientes |
 | 2026-07-19 | 94fab4f | `bench 16 1 5` | **22.723** | — | Primera firma de Terachess. Port 256 completo, eval material 26 tipos. Determinista ×3 |
+| 2026-07-19 | 242a3d5 | `bench 16 1 5` | **21.519** | 331.061 | Corrección del bug de LMR (`min(moveCount,40)`). Árbol distinto, como debe ser |
+| 2026-07-19 | 1341b14 | `bench 16 1 5` | **21.519** | 413.826 | ADR-001 (`to_cp` identidad). Firma **idéntica**: confirma que el cambio es solo de unidades y no toca el árbol |
+| 2026-07-19 | 3ce4612 | `bench 16 1 5` sin red | **21.519** | — | net-1 disponible; sin red la firma no cambia (la integración NNUE no altera el árbol material) |
 
 ## Otras mediciones de referencia (mismo commit 94fab4f)
 
@@ -28,5 +31,16 @@ profile-build está prohibido en esta máquina hasta que se demuestre lo contrar
 Nota sobre el NPS: los ~1,1 Mnps de búsqueda con eval material están MUY por
 encima del rango planificado (150–300 knps), porque la eval material es
 trivial. El número que manda para el datagen es **pos/s agregadas con los 24
-hilos escribiendo a disco** (piloto de F2), y el que mandará en F3 es el NPS
-con red S activa (peaje esperado −30/−50 %).
+hilos escribiendo a disco** (piloto de F2), y el que manda con red es el NPS
+con la red S activa.
+
+## Redes
+
+| Red | sha256 (12) | Datos | Elo vs material | Paridad |
+|---|---|---|---|---|
+| net1pre (archivada) | 6c6e91b6e40c | 408 k, unidades malas | −511,5 ± 63,0 | 0 cp |
+| netA (archivada) | — | 220 k | −544,7 ± 79,4 | 0 cp |
+| **tera-net1** | **6bb5cd483f5a** | **1.522.654** | **+330,2 ± 51,7** | **0 cp** |
+
+Peaje de nps de la red S medido: **14,2 %** de media (8,6 % en el mejor caso),
+en una máquina compartida con el datagen.
