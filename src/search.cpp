@@ -1223,7 +1223,11 @@ moves_loop:  // When in check, search starts here
                + (ttData.depth >= depth) * (923 + cutNode * 955);
 
         r += 714;  // Base reduction offset to compensate for other tweaks
-        r -= moveCount * 62;
+        // The linear term is chess-tuned for moveCount <= ~60. Terachess
+        // middlegames generate 150-300 legal moves, where it overwhelms the
+        // logarithmic reductions[] and turns reductions into extensions of up
+        // to 4.7 plies. Capped at the chess range; see docs/search-audit.md.
+        r -= std::min(moveCount, 40) * 62;
         r -= std::abs(correctionValue) / 26131;
 
         // Increase reduction for cut nodes

@@ -118,3 +118,67 @@ cross-check externo con Jocly (subconjunto Terachess I) y FSF-VLB (subconjunto
 Betza); verificación del ZRF cazauxchess.zip; consulta a Cazaux (repetición/50,
 lagunas [SUPUESTO]); publicación de las refs de perft en talkchess. Programado
 como verificación paralela, no como precondición de F1.
+
+---
+
+## 2026-07-19 — GATE FASE 1: PASS (commit 94fab4f)
+
+**Hipótesis**: el chasis SF master puede portarse a 256 casillas / 26 tipos
+conservando corrección demostrable, y una tercera implementación independiente
+(C++) convergerá con las dos del oráculo.
+
+**Evidencia**:
+- **Cross-check motor↔oráculo**: 87 fixtures con listas exactas de movimientos
+  legales + 15 posiciones de perft (d1–d2) → **0 fallos** (`engine_check.py`).
+- **Perft masivo**: 1.000 posiciones de random-walk, perft(2), **37.371.980
+  nodos hoja**, **0 discrepancias** motor vs oráculo (`mass_perft.py`, 396 s).
+- Perft startpos: 54 / 2.916 / 175.508 / 10.562.564 (d4 en ~4,6 s ≈ 2,3 Mnps).
+- **Bench determinista**: `bench 16 1 5` = **22.723** nodos, idéntico en 3
+  corridas. Búsqueda real depth 15 @ 2 s / 4 hilos sin crash.
+- Tres implementaciones independientes (Python mailbox, Python bitboards-int,
+  C++ bitboards-256) coinciden en todo lo medido.
+
+**Decisión**: gate F1 PASS. Representación congelada (Bitboard256 4×u64, Square
+u16, Move u32, ray-scan sin magics, historiales bucketed a 8 clases).
+
+**Learnings**: (1) el conteo a mano de perft(1)=54 acertó y sirvió de gate
+barato para la etapa de movegen. (2) `Move::null()` colisionaba con b1c1 en el
+layout nuevo: se movió a los bits de tipo especial (desviación del contrato,
+documentada en el código). (3) `DirtyThreat` empaquetaba casillas en 8 bits —
+incompatible con SQ_NONE=256; eliminado (lo reintroducirá F3 si el NNUE lo
+necesita, con ancho correcto). Confirma el riesgo #2 del plan (centinelas de
+8 bits) como real y sistémico.
+
+---
+
+## 2026-07-19 — F2a: auditoría de búsqueda — 1 bug confirmado, 1 métrica invalidada
+
+**Hipótesis**: las constantes chess-tuned del chasis están fuera de rango con
+branching 150–300 y contaminan cualquier medición (lección LMR de Spell).
+
+**Confirmado — bug de LMR** (`docs/search-audit.md` §1): el término lineal
+`r -= moveCount * 62` desborda al logarítmico `reductions[d]·reductions[mn]`.
+A depth 8 las reducciones se vuelven **extensiones a partir de moveCount 93**:
+mn=180 → **extiende 4,68 plies**; mn=300 → extiende 11,41. Todos los nodos de
+mediojuego de Terachess están en la zona perversa. Corregido con
+`std::min(moveCount, 40) * 62`; firma de bench 22.723 → 21.519 (árbol distinto,
+como debe ser). Sonda A/B a nodos fijos ejecutada con el oráculo como árbitro.
+
+**Documentado sin tocar — LMP** (§2): `(3 + depth²)/(2 − improving)` poda entre
+el 18 % y el 89 % de los movimientos quietos según profundidad (en ajedrez no
+poda casi nada). Es familia con umbral y dosis ⇒ arnés offline + matriz en F5
+con presupuesto declarado (6 SPRT), NO one-shot (lección C1 de Spell).
+
+**Invalidado honestamente — métrica de blunder** (§3): la calibración midió
+0,0 % / 2,5 % / 0,0 % de blunder a 10/20/40 k nodos y depth media 8,4–10,7.
+**No es creíble**: con eval material el árbitro a 4N usa la MISMA función ⇒ mide
+autoconsistencia, no calidad; y la depth está inflada por el LMP anterior
+(profundidad hueca en el sentido exacto de Spell). La regla predeclarada del
+plan no puede resolverse sin red. Sustituida por: nodos de datagen = 25.000 por
+presupuesto de tiempo y rendimientos decrecientes del delta; la regla original
+se re-ejecuta en F3b con la red S cargada. **Deuda técnica declarada, no gate
+superado.**
+
+**Learnings**: la disciplina del playbook (auditar ANTES de medir) se pagó sola
+en la primera hora: sin ella habríamos calibrado el datagen entero sobre una
+métrica que medía el eco de su propia evaluación.

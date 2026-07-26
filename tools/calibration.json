@@ -1,0 +1,38 @@
+{
+ "positions": 40,
+ "threads": 1,
+ "levels": {
+  "10000": {
+   "nodes": 10000,
+   "depth_mean": 8.43,
+   "depth_min": 1,
+   "depth_max": 11,
+   "blunder_rate_pct": 0.0,
+   "delta_mean_cp": 9.6,
+   "evaluated": 40,
+   "seconds": 28.4
+  },
+  "20000": {
+   "nodes": 20000,
+   "depth_mean": 9.6,
+   "depth_min": 1,
+   "depth_max": 14,
+   "blunder_rate_pct": 2.5,
+   "delta_mean_cp": 8.7,
+   "evaluated": 40,
+   "seconds": 29.2
+  },
+  "40000": {
+   "nodes": 40000,
+   "depth_mean": 10.65,
+   "depth_min": 1,
+   "depth_max": 14,
+   "blunder_rate_pct": 0.0,
+   "delta_mean_cp": 3.7,
+   "evaluated": 40,
+   "seconds": 99.0
+  }
+ },
+ "chosen_nodes": 10000,
+ "rule": "min N con blunder_rate<15% y depth_mean>=5"
+}
