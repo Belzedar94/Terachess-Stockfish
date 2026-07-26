@@ -298,3 +298,69 @@ nada permitió que tres implementaciones independientes (datagen C++, terabin
 Python, trainer PyTorch) compusieran a la primera. El único choque —la
 contradicción fc0 512 vs 256— lo detectó la verificación cruzada del trainer
 contra el propio contrato, antes de entrenar ninguna red real.
+
+---
+
+## 2026-07-19 — F3b GATE DE PARIDAD: PASS (0 cp) — commit 038b723
+
+**Evidencia**: 1.200 posiciones reales estratificadas (los 8 output buckets
+representados: 144/144/144/144/143/143/145/193), red **real** entrenada sobre
+datos **reales**, comparando motor C++ contra `quantized_forward.py`:
+**0 discrepancias** en índices de features de ambas perspectivas, `psqt`,
+`positional`, `total_cp` y `bucket`. Tolerancia exigida y obtenida: exactamente
+0 cp.
+
+Verificaciones del lado motor: acumulador incremental vs refresh completo en
+**6.000 plies** de 20 partidas (0 diferencias, incluidas las de deshacer y los
+867 refrescos forzados por cambio de bucket/espejo); cargador que rechaza las 5
+corrupciones probadas (magic, versión, arch_hash, dims, tamaño) con causa
+exacta y cae a material sin crash; `bench 16 1 5` = 21.519 **exacto** sin red
+(la integración no altera el árbol); `perft 3` = 175.508; peaje de nps 14,2 %.
+
+---
+
+## 2026-07-19 — F3 GATE DE FUERZA: **FAIL** (−511 Elo) → causa raíz ADR-001
+
+| id | red | partidas | W/L/D | Elo | veredicto |
+|---|---|---|---|---|---|
+| net1pre | S, 8 buckets, 408 k registros, 6 épocas | 160 @10k nodos | +8 −152 =0 | **−511,5 ± 63,0** | **FAIL** (gate exigía ≥+100) |
+
+**Autopsia** (el gate hizo exactamente su trabajo): con la paridad en 0 cp, la
+fontanería estaba bien; el fallo tenía que estar en la red o en los datos.
+Diagnóstico por medición, no por conjetura:
+
+1. Distribución de datos: descartada como causa. El desequilibrio material tenía
+   desviación 1.408 cp y el 36,8 % de las posiciones superaba los 1.000 cp — hay
+   señal de sobra para aprender el valor de las piezas.
+2. Comparación directa red vs material sobre las mismas 120 posiciones:
+   correlación **0,992** pero desviación **499 frente a 2.043** y ratio mediano
+   **0,242**. La red era una copia fiel del material **a 1/4 de escala**.
+3. Origen: los labels ya venían comprimidos. `score.cpp:34` guarda en un campo
+   llamado `InternalUnits` el valor **ya convertido** por `to_cp`, y `to_cp`
+   dividía por el `a` del modelo WDL **de ajedrez**, que cuenta
+   `P+3N+3B+5R+9Q` (toda pieza propia de Terachess vale cero) y satura el
+   material a [17,78] cuando la inicial tiene 128 piezas.
+
+Con la evaluación comprimida 4×, todos los márgenes de poda —calibrados en la
+escala del material— se volvieron efectivamente 4× más agresivos. De ahí los
+−511 Elo.
+
+**Decisión (ADR-001, `docs/eval-units.md`)**: `to_cp` pasa a ser la identidad —
+en Terachess la unidad interna ES el centipeón reportado. Bench sin cambios
+(21.519): el árbol no se toca, solo las unidades. Los 720.684 registros
+generados se **descartan**: su escala depende del material a través de `a`, así
+que no son recuperables con un factor constante.
+
+**Gate nuevo para que no se repita**: `tools/check_label_units.py` exige que la
+pendiente label/eval esté en [0,8, 1,25] con correlación >0,9, sobre toda
+campaña y **antes** de entrenar. Validado contra los datos viejos: da FAIL con
+pendiente 0,263.
+
+**Learnings**: (1) un nombre de campo mentiroso heredado del upstream
+(`InternalUnits` conteniendo cp convertidos) costó una red y ~4 horas de CPU;
+(2) el gate de paridad ==0 cp verifica que dos implementaciones **coinciden**,
+no que la magnitud sea la **correcta** — hacía falta un gate de unidades
+separado, y ahora existe; (3) importar un modelo estadístico ajustado a ajedrez
+(WDL) a una variante con 128 piezas y 26 tipos es exactamente la clase de
+supuesto que el playbook manda auditar: estaba en la lista de "constantes
+chess-tuned" y aun así se coló por venir en una ruta de "solo presentación".
