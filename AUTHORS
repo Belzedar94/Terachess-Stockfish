@@ -1,0 +1,44 @@
+# Terachess-Stockfish
+
+Terachess-Stockfish is a derivative of Stockfish, adapted to Terachess II
+(16x16 board, 26 piece types) by Jean-Louis Cazaux.
+
+## Terachess-Stockfish
+
+David J. (Belzedar94)
+  - 256-square board representation, move generation for the 26 Terachess
+    piece types, NNUE feature set and network format, embedded data
+    generation, training pipeline, verification harness.
+
+## Rules of Terachess
+
+Jean-Louis Cazaux
+  - Inventor of Terachess (2008) and Terachess II (2020).
+    http://history.chess.free.fr/terachess.htm
+  - The rules implemented here follow his specification; the engine and this
+    project are not affiliated with or endorsed by him.
+
+H. G. Muller
+  - The Interactive Diagram on the chessvariants.com page for Terachess II,
+    whose Betza notation was used as the primary machine-readable source when
+    writing the rules specification.
+
+## Upstream: Stockfish
+
+Terachess-Stockfish is built on Stockfish, which is Copyright (C) 2004-2026
+The Stockfish developers. The full list of Stockfish authors is available at
+
+    https://github.com/official-stockfish/Stockfish/blob/master/AUTHORS
+
+Stockfish was originally developed by Tord Romstad, Marco Costalba, Joona
+Kiiski and Gary Linscott, and is maintained by the Stockfish community.
+
+The 256-bit bitboard operators were adapted from the very-large-boards branch
+of Fairy-Stockfish (Fabian Fichter and contributors, GPLv3), itself a
+derivative of Stockfish.
+
+## License
+
+Terachess-Stockfish is free software distributed under the GNU General Public
+License version 3, as published by the Free Software Foundation. See
+Copying.txt for the full text.

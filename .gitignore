@@ -14,3 +14,4 @@ data/*.tnn
 data/*_ckpt/
 data/*.log
 nets/*.tnn
+release/
