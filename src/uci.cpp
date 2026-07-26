@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "benchmark.h"
+#include "datagen.h"
 #include "engine.h"
 #include "memory.h"
 #include "movegen.h"
@@ -148,6 +149,8 @@ void UCIEngine::loop() {
         }
         else if (token == "bench")
             bench(is);
+        else if (token == "datagen")
+            datagen(is);
         else if (token == BenchmarkCommand)
             benchmark(is);
         else if (token == "d")
@@ -457,6 +460,20 @@ void UCIEngine::benchmark(std::istream& args) {
 void UCIEngine::setoption(std::istringstream& is) {
     engine.wait_for_search_finished();
     engine.get_options().setoption(is);
+}
+
+// Embedded tera-bin v1 self-play generator (OpenBench DATAGEN contract: a
+// single stdin line, one merged file at `out`, exit code 0 on success).
+void UCIEngine::datagen(std::istream& args) {
+    engine.wait_for_search_finished();
+
+    std::optional<std::filesystem::path> binaryPath;
+    if (cli.argc > 0)
+        binaryPath = path_from_utf8(cli.argv[0]);
+
+    std::string error;
+    if (!Datagen::run(args, binaryPath, error))
+        terminate_on_critical_error("datagen: " + error);
 }
 
 u64 UCIEngine::perft(const Search::LimitsType& limits) {

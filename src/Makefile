@@ -76,14 +76,14 @@ BINDIR = $(PREFIX)/bin
 PGOBENCH = $(RUN_PREFIX) ./$(EXE) bench
 
 ### Source and object files
-SRCS = benchmark.cpp bitboard.cpp evaluate.cpp main.cpp notation.cpp \
+SRCS = benchmark.cpp bitboard.cpp datagen.cpp evaluate.cpp main.cpp notation.cpp \
 	misc.cpp movegen.cpp movepick.cpp position.cpp \
 	search.cpp thread.cpp timeman.cpp tt.cpp uci.cpp ucioption.cpp tune.cpp \
 	engine.cpp score.cpp memory.cpp
 
 OTHER_SRCS = universal/entry_x86.cpp universal/entry_arm64.cpp universal/entry_riscv64.cpp universal/nnue_embed.cpp
 
-HEADERS = benchmark.h bitboard.h evaluate.h misc.h movegen.h movepick.h history.h \
+HEADERS = benchmark.h bitboard.h datagen.h evaluate.h misc.h movegen.h movepick.h history.h \
 		notation.h position.h search.h thread.h thread_win32_osx.h timeman.h \
 		tt.h tune.h types.h uci.h ucioption.h perft.h engine.h score.h numa.h memory.h shm.h shm_linux.h
 

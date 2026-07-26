@@ -1,6 +1,10 @@
 benchmark.o: benchmark.cpp benchmark.h notation.h types.h misc.h tune.h \
  numa.h shm.h memory.h
 bitboard.o: bitboard.cpp bitboard.h types.h misc.h tune.h
+datagen.o: datagen.cpp datagen.h engine.h misc.h history.h memory.h \
+ types.h tune.h position.h bitboard.h numa.h shm.h search.h movegen.h \
+ score.h timeman.h thread.h thread_win32_osx.h tt.h ucioption.h \
+ notation.h uci.h
 evaluate.o: evaluate.cpp evaluate.h types.h misc.h tune.h position.h \
  bitboard.h
 main.o: main.cpp bitboard.h types.h misc.h tune.h position.h uci.h \
@@ -30,7 +34,8 @@ tt.o: tt.cpp tt.h misc.h memory.h types.h tune.h thread.h numa.h shm.h \
  thread_win32_osx.h
 uci.o: uci.cpp uci.h engine.h misc.h history.h memory.h types.h tune.h \
  position.h bitboard.h numa.h shm.h search.h movegen.h score.h timeman.h \
- thread.h thread_win32_osx.h tt.h ucioption.h notation.h benchmark.h
+ thread.h thread_win32_osx.h tt.h ucioption.h notation.h benchmark.h \
+ datagen.h
 ucioption.o: ucioption.cpp ucioption.h misc.h
 tune.o: tune.cpp tune.h misc.h ucioption.h
 engine.o: engine.cpp engine.h misc.h history.h memory.h types.h tune.h \

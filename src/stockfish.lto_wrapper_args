@@ -2,6 +2,7 @@
 -flinker-output=exec
 benchmark.o
 bitboard.o
+datagen.o
 evaluate.o
 main.o
 notation.o
