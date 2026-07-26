@@ -593,13 +593,19 @@ std::string UCIEngine::format_score(const Score& s) {
 // without treatment of mate and similar special scores.
 int UCIEngine::to_cp(Value v, const Position& pos) {
 
-    // In general, the score can be defined via the WDL as
-    // (log(1/L - 1) - log(1/W - 1)) / (log(1/L - 1) + log(1/W - 1)).
-    // Based on our win_rate_model, this simply yields v / a.
-
-    auto [a, b] = win_rate_params(pos);
-
-    return int(std::round(100 * int(v) / a));
+    // Identity: in Terachess our internal Value IS the reported centipawn.
+    //
+    // Upstream divides by the WDL model's `a`, fitted on chess games. That model
+    // counts only P/N/B/R/Q -- every Terachess-specific piece contributes zero --
+    // and clamps material to [17, 78] while our start position has 128 pieces, so
+    // `a` degenerates to an arbitrary constant that compressed reported scores to
+    // ~1/4 of the eval they came from. Because `Score` stores the *converted*
+    // number (score.cpp), datagen labels ended up in a different space than
+    // Eval::evaluate(), which is what a network trained on them must reproduce.
+    // See docs/eval-units.md (ADR). A Terachess WDL model can be fitted in F4
+    // from real game outcomes; until then units are honest and self-consistent.
+    (void) pos;
+    return int(v);
 }
 
 std::string UCIEngine::wdl(Value v, const Position& pos) {
