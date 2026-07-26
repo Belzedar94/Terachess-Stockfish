@@ -264,7 +264,11 @@ std::string compiler_info() {
 #if defined(USE_AVX512)
     compiler += " AVX512";
 #endif
-    compiler += (HasPext ? " BMI2" : "");
+    // HasPext left types.h with the magic bitboards (T256 board layer);
+    // report BMI2 straight from the build flag.
+#if defined(USE_PEXT)
+    compiler += " BMI2";
+#endif
 #if defined(USE_AVX2)
     compiler += " AVX2";
 #endif

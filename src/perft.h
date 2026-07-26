@@ -51,17 +51,16 @@ u64 perft(Position& pos, Depth depth) {
             pos.undo_move(m);
         }
         if (Root)
-            sync_cout << Notation::move(m, pos.is_chess960()) << ": " << cnt << sync_endl;
+            sync_cout << Notation::move(m) << ": " << cnt << sync_endl;
     }
     return nodes;
 }
 
-inline std::variant<u64, PositionSetError>
-perft(const std::string& fen, Depth depth, bool isChess960) {
+inline std::variant<u64, PositionSetError> perft(const std::string& fen, Depth depth) {
     StateInfo st;
     Position  p;
 
-    if (auto err = p.set(fen, isChess960, &st))
+    if (auto err = p.set(fen, &st))
         return {*err};
 
     return perft<true>(p, depth);

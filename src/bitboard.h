@@ -27,6 +27,9 @@
 #include "types.h"
 #include "misc.h"
 
+// 256-square board layer (16x16). Sliders use ray-scan over precomputed rays
+// (frozen contract, docs/port-256-design.md); magic bitboards are gone.
+
 namespace Stockfish {
 
 namespace Bitboards {
@@ -36,39 +39,38 @@ std::string pretty(Bitboard b);
 
 }  // namespace Stockfish::Bitboards
 
-#ifdef USE_AVX512
-// clang-format off
-inline const __m512i AllSquares = _mm512_set_epi8(
-    63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41,
-    40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18,
-    17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
-// clang-format on
-#endif
-
-constexpr Bitboard FileABB = 0x0101010101010101ULL;
-constexpr Bitboard FileBBB = FileABB << 1;
-constexpr Bitboard FileCBB = FileABB << 2;
-constexpr Bitboard FileDBB = FileABB << 3;
-constexpr Bitboard FileEBB = FileABB << 4;
-constexpr Bitboard FileFBB = FileABB << 5;
-constexpr Bitboard FileGBB = FileABB << 6;
-constexpr Bitboard FileHBB = FileABB << 7;
-
-constexpr Bitboard Rank1BB = 0xFF;
-constexpr Bitboard Rank2BB = Rank1BB << (8 * 1);
-constexpr Bitboard Rank3BB = Rank1BB << (8 * 2);
-constexpr Bitboard Rank4BB = Rank1BB << (8 * 3);
-constexpr Bitboard Rank5BB = Rank1BB << (8 * 4);
-constexpr Bitboard Rank6BB = Rank1BB << (8 * 5);
-constexpr Bitboard Rank7BB = Rank1BB << (8 * 6);
-constexpr Bitboard Rank8BB = Rank1BB << (8 * 7);
-
-extern u8 PopCnt16[1 << 16];
+constexpr Bitboard AllSquaresBB = Bitboard(~0ULL, ~0ULL, ~0ULL, ~0ULL);
 
 constexpr Bitboard square_bb(Square s) {
     assert(is_ok(s));
-    return 1ULL << s;
+    u64 nw[4] = {0, 0, 0, 0};
+    nw[s >> 6] = 1ULL << (s & 63);
+    return Bitboard(nw[0], nw[1], nw[2], nw[3]);
 }
+
+// rank_bb() and file_bb() return a bitboard representing all the squares on
+// the given file or rank. Each 64-bit word holds 4 ranks of 16 squares; a
+// file occupies bit positions f, f+16, f+32, f+48 of every word.
+
+constexpr Bitboard rank_bb(Rank r) {
+    u64 nw[4]  = {0, 0, 0, 0};
+    nw[r >> 2] = 0xFFFFULL << ((r & 3) * 16);
+    return Bitboard(nw[0], nw[1], nw[2], nw[3]);
+}
+
+constexpr Bitboard rank_bb(Square s) { return rank_bb(rank_of(s)); }
+
+constexpr Bitboard file_bb(File f) {
+    const u64 col = 0x0001000100010001ULL << f;
+    return Bitboard(col, col, col, col);
+}
+
+constexpr Bitboard file_bb(Square s) { return file_bb(file_of(s)); }
+
+constexpr Bitboard FileABB  = file_bb(FILE_A);
+constexpr Bitboard FilePBB  = file_bb(FILE_P);
+constexpr Bitboard Rank1BB  = rank_bb(RANK_1);
+constexpr Bitboard Rank16BB = rank_bb(RANK_16);
 
 
 // Overloads of bitwise operators between a Bitboard and a Square for testing
@@ -86,35 +88,23 @@ constexpr Bitboard operator^(Square s, Bitboard b) { return b ^ s; }
 
 constexpr Bitboard operator|(Square s1, Square s2) { return square_bb(s1) | s2; }
 
-constexpr bool more_than_one(Bitboard b) { return b & (b - 1); }
-
-
-// rank_bb() and file_bb() return a bitboard representing all the squares on
-// the given file or rank.
-
-constexpr Bitboard rank_bb(Rank r) { return Rank1BB << (8 * r); }
-
-constexpr Bitboard rank_bb(Square s) { return rank_bb(rank_of(s)); }
-
-constexpr Bitboard file_bb(File f) { return FileABB << f; }
-
-constexpr Bitboard file_bb(Square s) { return file_bb(file_of(s)); }
+constexpr bool more_than_one(Bitboard b) { return bool(b & (b - 1)); }
 
 
 // Moves a bitboard one or two steps as specified by the direction D
 template<Direction D>
 constexpr Bitboard shift(Bitboard b) {
-    return D == NORTH         ? b << 8
-         : D == SOUTH         ? b >> 8
-         : D == NORTH + NORTH ? b << 16
-         : D == SOUTH + SOUTH ? b >> 16
-         : D == EAST          ? (b & ~FileHBB) << 1
+    return D == NORTH         ? b << 16
+         : D == SOUTH         ? b >> 16
+         : D == NORTH + NORTH ? b << 32
+         : D == SOUTH + SOUTH ? b >> 32
+         : D == EAST          ? (b & ~FilePBB) << 1
          : D == WEST          ? (b & ~FileABB) >> 1
-         : D == NORTH_EAST    ? (b & ~FileHBB) << 9
-         : D == NORTH_WEST    ? (b & ~FileABB) << 7
-         : D == SOUTH_EAST    ? (b & ~FileHBB) >> 7
-         : D == SOUTH_WEST    ? (b & ~FileABB) >> 9
-                              : 0;
+         : D == NORTH_EAST    ? (b & ~FilePBB) << 17
+         : D == NORTH_WEST    ? (b & ~FileABB) << 15
+         : D == SOUTH_EAST    ? (b & ~FilePBB) >> 15
+         : D == SOUTH_WEST    ? (b & ~FileABB) >> 17
+                              : Bitboard();
 }
 
 
@@ -130,129 +120,262 @@ constexpr Bitboard pawn_single_push_bb(Color c, Bitboard b) {
     return c == WHITE ? shift<NORTH>(b) : shift<SOUTH>(b);
 }
 
-inline int edge_distance(File f) { return std::min(f, File(FILE_H - f)); }
+inline int edge_distance(File f) { return std::min(int(f), int(FILE_P - f)); }
 
-constexpr int constexpr_popcount(Bitboard b) {
-    b = b - ((b >> 1) & 0x5555555555555555ULL);
-    b = (b & 0x3333333333333333ULL) + ((b >> 2) & 0x3333333333333333ULL);
-    b = (b + (b >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
-    return static_cast<int>((b * 0x0101010101010101ULL) >> 56);
+
+// Per-word scan helpers
+
+inline int popcount64(u64 v) {
+#ifndef USE_POPCNT
+    extern u8 PopCnt16[1 << 16];  // defined in bitboard.cpp
+    u16       quarters[4];
+    std::memcpy(quarters, &v, sizeof(v));
+    return PopCnt16[quarters[0]] + PopCnt16[quarters[1]] + PopCnt16[quarters[2]]
+         + PopCnt16[quarters[3]];
+#elif defined(_MSC_VER)
+    return int(_mm_popcnt_u64(v));
+#else
+    return __builtin_popcountll(v);
+#endif
+}
+
+inline int lsb64(u64 v) {
+    assert(v);
+#if defined(__GNUC__)
+    return __builtin_ctzll(v);
+#elif defined(_MSC_VER) && defined(_WIN64)
+    unsigned long idx;
+    _BitScanForward64(&idx, v);
+    return int(idx);
+#else
+    #error "Compiler not supported."
+#endif
+}
+
+inline int msb64(u64 v) {
+    assert(v);
+#if defined(__GNUC__)
+    return 63 ^ __builtin_clzll(v);
+#elif defined(_MSC_VER) && defined(_WIN64)
+    unsigned long idx;
+    _BitScanReverse64(&idx, v);
+    return int(idx);
+#else
+    #error "Compiler not supported."
+#endif
 }
 
 // Counts the number of non-zero bits in a bitboard.
 inline int popcount(Bitboard b) {
-
-#ifndef USE_POPCNT
-
-    u16 indices[4];
-    std::memcpy(indices, &b, sizeof(b));
-    return PopCnt16[indices[0]] + PopCnt16[indices[1]] + PopCnt16[indices[2]]
-         + PopCnt16[indices[3]];
-
-#elif defined(_MSC_VER)
-
-    return int(_mm_popcnt_u64(b));
-
-#else  // Assumed gcc or compatible compiler
-
-    return __builtin_popcountll(b);
-
-#endif
-}
-
-inline constexpr int lsb_index64[64] = {
-  0,  47, 1,  56, 48, 27, 2,  60, 57, 49, 41, 37, 28, 16, 3,  61, 54, 58, 35, 52, 50, 42,
-  21, 44, 38, 32, 29, 23, 17, 11, 4,  62, 46, 55, 26, 59, 40, 36, 15, 53, 34, 51, 20, 43,
-  31, 22, 10, 45, 25, 39, 14, 33, 19, 30, 9,  24, 13, 18, 8,  12, 7,  6,  5,  63};
-
-constexpr int constexpr_lsb(u64 bb) {
-    assert(bb != 0);
-    constexpr u64 debruijn64 = 0x03F79D71B4CB0A89ULL;
-    return lsb_index64[((bb ^ (bb - 1)) * debruijn64) >> 58];
+    return popcount64(b.w[0]) + popcount64(b.w[1]) + popcount64(b.w[2]) + popcount64(b.w[3]);
 }
 
 // Returns the least significant bit in a non-zero bitboard.
 inline Square lsb(Bitboard b) {
-    assert(b);
-
-#if defined(__GNUC__)  // GCC, Clang, ICX
-
-    return Square(__builtin_ctzll(b));
-
-#elif defined(_MSC_VER)
-    #ifdef _WIN64  // MSVC, WIN64
-
-    unsigned long idx;
-    _BitScanForward64(&idx, b);
-    return Square(idx);
-
-    #else  // MSVC, WIN32
-    unsigned long idx;
-
-    if (b & 0xffffffff)
-    {
-        _BitScanForward(&idx, i32(b));
-        return Square(idx);
-    }
-    else
-    {
-        _BitScanForward(&idx, i32(b >> 32));
-        return Square(idx + 32);
-    }
-    #endif
-#else  // Compiler is neither GCC nor MSVC compatible
-    #error "Compiler not supported."
-#endif
+    assert(bool(b));
+    for (int i = 0; i < 3; ++i)
+        if (b.w[i])
+            return Square(64 * i + lsb64(b.w[i]));
+    return Square(192 + lsb64(b.w[3]));
 }
 
 // Returns the most significant bit in a non-zero bitboard.
 inline Square msb(Bitboard b) {
-    assert(b);
-
-#if defined(__GNUC__)  // GCC, Clang, ICX
-
-    return Square(63 ^ __builtin_clzll(b));
-
-#elif defined(_MSC_VER)
-    #ifdef _WIN64  // MSVC, WIN64
-
-    unsigned long idx;
-    _BitScanReverse64(&idx, b);
-    return Square(idx);
-
-    #else  // MSVC, WIN32
-
-    unsigned long idx;
-
-    if (b >> 32)
-    {
-        _BitScanReverse(&idx, i32(b >> 32));
-        return Square(idx + 32);
-    }
-    else
-    {
-        _BitScanReverse(&idx, i32(b));
-        return Square(idx);
-    }
-    #endif
-#else  // Compiler is neither GCC nor MSVC compatible
-    #error "Compiler not supported."
-#endif
+    assert(bool(b));
+    for (int i = 3; i > 0; --i)
+        if (b.w[i])
+            return Square(64 * i + msb64(b.w[i]));
+    return Square(msb64(b.w[0]));
 }
 
 // Returns the bitboard of the least significant
 // square of a non-zero bitboard. It is equivalent to square_bb(lsb(bb)).
 inline Bitboard least_significant_square_bb(Bitboard b) {
-    assert(b);
+    assert(bool(b));
     return b & -b;
 }
 
 // Finds and clears the least significant bit in a non-zero bitboard.
 inline Square pop_lsb(Bitboard& b) {
-    assert(b);
-    const Square s = lsb(b);
-    b &= b - 1;
-    return s;
+    assert(bool(b));
+    for (int i = 0; i < 4; ++i)
+        if (b.w[i])
+        {
+            const int bit = lsb64(b.w[i]);
+            b.w[i] &= b.w[i] - 1;
+            return Square(64 * i + bit);
+        }
+    return SQ_NONE;  // unreachable
+}
+
+
+// The 8 ray directions. Order matters: 0-3 orthogonal, 4-7 diagonal, and
+// opposite(d) = d ^ 2 within each group.
+enum RayDir : int {
+    RAY_N  = 0,
+    RAY_E  = 1,
+    RAY_S  = 2,
+    RAY_W  = 3,
+    RAY_NE = 4,
+    RAY_SE = 5,
+    RAY_SW = 6,
+    RAY_NW = 7,
+    RAY_NB = 8
+};
+
+constexpr Direction RayDirection[RAY_NB] = {NORTH,      EAST,       SOUTH,      WEST,
+                                            NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST};
+
+// True if the direction has a positive square delta (scan with lsb; else msb)
+constexpr bool RayPositive[RAY_NB] = {true, true, false, false, true, false, false, true};
+
+constexpr int opposite_ray(int d) { return d ^ 2; }
+
+// Direction-set masks for hoppers (bit d set = ray direction d included)
+constexpr int ORTHO_RAYS = 0x0F;
+constexpr int DIAG_RAYS  = 0xF0;
+constexpr int ALL_RAYS   = 0xFF;
+
+// Ray[s][d]: squares strictly beyond s in ray direction d, up to the edge
+extern Bitboard Ray[SQUARE_NB][RAY_NB];
+
+// LineBB[s1][s2]: full line (rank/file/diagonal) through aligned s1, s2,
+// both included; empty if not aligned.
+// BetweenBB[s1][s2]: squares strictly between aligned s1 and s2, plus s2;
+// just s2 if not aligned (Stockfish master semantics).
+extern Bitboard LineBB[SQUARE_NB][SQUARE_NB];
+extern Bitboard BetweenBB[SQUARE_NB][SQUARE_NB];
+
+// Empty-board attack sets: full leaper/step patterns, and slider masks for
+// ray pieces. TROLL holds only its (3,3)/(0,3) jumps (the pawn-step part is
+// generated in movegen); PRINCE holds its king-step pattern (double push in
+// movegen); KING holds the plain 8-step pattern (initial jump in movegen).
+// CANNON/ARCHER/SORCERESS hold the corresponding empty-board slider mask
+// (candidate superset for both quiet slides and screen captures).
+extern Bitboard PseudoAttacks[PIECE_TYPE_NB][SQUARE_NB];
+extern Bitboard PawnAttacks[COLOR_NB][SQUARE_NB];
+
+// Single-step atoms used by compound pieces: F-step (diagonal) and W-step
+// (orthogonal) king steps.
+extern Bitboard DiagStepBB[SQUARE_NB];
+extern Bitboard OrthStepBB[SQUARE_NB];
+
+inline Bitboard line_bb(Square s1, Square s2) {
+    assert(is_ok(s1) && is_ok(s2));
+    return LineBB[s1][s2];
+}
+
+inline Bitboard between_bb(Square s1, Square s2) {
+    assert(is_ok(s1) && is_ok(s2));
+    return BetweenBB[s1][s2];
+}
+
+inline bool aligned(Square s1, Square s2, Square s3) { return bool(line_bb(s1, s2) & s3); }
+
+
+// Slider attacks along one ray by ray-scan: first blocker cuts the ray.
+inline Bitboard ray_attacks(Square s, int d, Bitboard occupied) {
+    Bitboard       attacks  = Ray[s][d];
+    const Bitboard blockers = attacks & occupied;
+    if (bool(blockers))
+        attacks ^= Ray[RayPositive[d] ? lsb(blockers) : msb(blockers)][d];
+    return attacks;
+}
+
+inline Bitboard ray_attacks_mask(Square s, int dirs, Bitboard occupied) {
+    Bitboard attacks;
+    for (int d = 0; d < RAY_NB; ++d)
+        if ((dirs >> d) & 1)
+            attacks |= ray_attacks(s, d, occupied);
+    return attacks;
+}
+
+// Bent riders (spec 4.1). Returned set has standard move-or-capture
+// semantics; the caller masks out own pieces.
+Bitboard eagle_attacks(Square s, Bitboard occupied);
+Bitboard rhino_attacks(Square s, Bitboard occupied);
+
+// Screen pieces (spec 4.2). hopper_quiet: normal sliding, no captures
+// (stops BEFORE the first blocker). hopper_captures: per direction, the
+// second blocker B2 if it exists (caller checks that B2 is an enemy).
+inline Bitboard hopper_quiet(Square s, Bitboard occupied, int dirs) {
+    return ray_attacks_mask(s, dirs, occupied) & ~occupied;
+}
+
+Bitboard hopper_captures(Square s, Bitboard occupied, int dirs);
+
+
+// Returns the attacks by the given piece type with the given occupancy.
+// Hoppers (CANNON/ARCHER/SORCERESS) are excluded: their move and capture
+// sets differ, use hopper_quiet()/hopper_captures(). PAWN uses PawnAttacks.
+template<PieceType Pt>
+inline Bitboard attacks_bb(Square s, Bitboard occupied) {
+    static_assert(Pt != PAWN && Pt != CANNON && Pt != ARCHER && Pt != SORCERESS
+                    && Pt != NO_PIECE_TYPE,
+                  "attacks_bb: unsupported piece type");
+    assert(is_ok(s));
+
+    switch (Pt)
+    {
+    case ROOK :
+        return ray_attacks_mask(s, ORTHO_RAYS, occupied);
+    case BISHOP :
+        return ray_attacks_mask(s, DIAG_RAYS, occupied);
+    case QUEEN :
+        return ray_attacks_mask(s, ALL_RAYS, occupied);
+    case ADMIRAL :
+        return ray_attacks_mask(s, ORTHO_RAYS, occupied) | DiagStepBB[s];
+    case MISSIONARY :
+        return ray_attacks_mask(s, DIAG_RAYS, occupied) | OrthStepBB[s];
+    case MARSHALL :
+        return ray_attacks_mask(s, ORTHO_RAYS, occupied) | PseudoAttacks[KNIGHT][s];
+    case CARDINAL :
+        return ray_attacks_mask(s, DIAG_RAYS, occupied) | PseudoAttacks[KNIGHT][s];
+    case AMAZON :
+        return ray_attacks_mask(s, ALL_RAYS, occupied) | PseudoAttacks[KNIGHT][s];
+    case EAGLE :
+        return eagle_attacks(s, occupied);
+    case RHINO :
+        return rhino_attacks(s, occupied);
+    default :  // pure leapers/steppers ignore occupancy
+        return PseudoAttacks[Pt][s];
+    }
+}
+
+// Runtime-dispatch version of the above
+inline Bitboard attacks_bb(PieceType pt, Square s, Bitboard occupied) {
+    assert(pt != PAWN && pt != NO_PIECE_TYPE && is_ok(s));
+
+    switch (pt)
+    {
+    case ROOK :
+        return attacks_bb<ROOK>(s, occupied);
+    case BISHOP :
+        return attacks_bb<BISHOP>(s, occupied);
+    case QUEEN :
+        return attacks_bb<QUEEN>(s, occupied);
+    case ADMIRAL :
+        return attacks_bb<ADMIRAL>(s, occupied);
+    case MISSIONARY :
+        return attacks_bb<MISSIONARY>(s, occupied);
+    case MARSHALL :
+        return attacks_bb<MARSHALL>(s, occupied);
+    case CARDINAL :
+        return attacks_bb<CARDINAL>(s, occupied);
+    case AMAZON :
+        return attacks_bb<AMAZON>(s, occupied);
+    case EAGLE :
+        return eagle_attacks(s, occupied);
+    case RHINO :
+        return rhino_attacks(s, occupied);
+    case CANNON :
+    case ARCHER :
+    case SORCERESS :
+        assert(false && "hoppers: use hopper_quiet()/hopper_captures()");
+        return Bitboard();
+    default :
+        return PseudoAttacks[pt][s];
+    }
 }
 
 }  // namespace Stockfish

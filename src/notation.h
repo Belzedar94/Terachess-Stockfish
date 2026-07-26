@@ -27,15 +27,19 @@ namespace Stockfish {
 
 class Position;
 
-constexpr auto StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+// Terachess II start position (TERACHESS_SPEC.md 3.2)
+constexpr auto StartFEN =
+  "sjyhxfdoodfxhyjs/cmztuvlkalvutzmc/ernbwigqqgiwbnre/pppppppppppppppp/16/16/16/16/16/16/16/16/"
+  "PPPPPPPPPPPPPPPP/ERNBWIGQQGIWBNRE/CMZTUVLKALVUTZMC/SJYHXFDOODFXHYJS w Kk - 0 1";
 
-// Coordinate notation, shared by the UCI front end and the rules layer
-// (Position::fen). This TU has no dependency on the engine/search/NNUE
-// closure.
+// Coordinate notation (spec 11), shared by the UCI front end and the rules
+// layer (Position::fen). This TU has no dependency on the engine/search/NNUE
+// closure, and none on movegen either: to_move() builds the move from the
+// position context; the caller is responsible for legality validation.
 namespace Notation {
 
 std::string square(Square s);
-std::string move(Move m, bool chess960 = false);
+std::string move(Move m);
 std::string to_lower(std::string str);
 Move        to_move(const Position& pos, std::string str);
 

@@ -32,12 +32,9 @@
 
 #include "misc.h"
 #include "history.h"
-#include "nnue/network.h"
-#include "nnue/nnue_misc.h"
 #include "numa.h"
 #include "position.h"
 #include "search.h"
-#include "syzygy/tbprobe.h"  // for Stockfish::Depth
 #include "thread.h"
 #include "tt.h"
 #include "ucioption.h"
@@ -60,7 +57,7 @@ class Engine {
 
     ~Engine() { wait_for_search_finished(); }
 
-    std::variant<u64, PositionSetError> perft(const std::string& fen, Depth depth, bool isChess960);
+    std::variant<u64, PositionSetError> perft(const std::string& fen, Depth depth);
 
     // non blocking call to start searching
     void go(Search::LimitsType&);
@@ -85,14 +82,6 @@ class Engine {
     void set_on_update_full(std::function<void(const InfoFull&)>&&);
     void set_on_iter(std::function<void(const InfoIter&)>&&);
     void set_on_bestmove(std::function<void(std::string_view, std::string_view)>&&);
-    void set_on_verify_network(std::function<void(std::string_view)>&&);
-
-    // network related
-
-    void                                 verify_network() const;
-    std::unique_ptr<Eval::NNUE::Network> get_default_network();
-    void                                 load_network(const std::filesystem::path& file);
-    void save_network(const std::optional<std::filesystem::path>& file);
 
     // utility functions
 
@@ -120,15 +109,12 @@ class Engine {
     Position     pos;
     StateListPtr states;
 
-    OptionsMap                                        options;
-    ThreadPool                                        threads;
-    TranspositionTable                                tt;
-    Eval::NNUE::EvalFile                              networkFile;
-    LazyNumaReplicatedSystemWide<Eval::NNUE::Network> network;
+    OptionsMap         options;
+    ThreadPool         threads;
+    TranspositionTable tt;
 
-    Search::SearchManager::UpdateContext  updateContext;
-    std::function<void(std::string_view)> onVerifyNetwork;
-    std::map<NumaIndex, SharedHistories>  sharedHists;
+    Search::SearchManager::UpdateContext updateContext;
+    std::map<NumaIndex, SharedHistories> sharedHists;
 };
 
 }  // namespace Stockfish

@@ -27,27 +27,15 @@ namespace Stockfish {
 
 class Position;
 
+// F1 evaluation (frozen contract): material over the 26 Terachess piece
+// types (spec 8 values, stored in PieceTypeValue) plus a 20cp tempo bonus.
+// NNUE is out of the build entirely; F3 reintroduces it.
 namespace Eval {
 
-// The default net name MUST follow the format nn-[SHA256 first 12 digits].nnue
-// for the build process (profile-build and fishtest) to work. Do not change the
-// name of the macro or the location where this macro is defined, as it is used
-// in the Makefile/Fishtest.
-#define EvalFileDefaultName "nn-0ee0657fb25e.nnue"
+Value evaluate(const Position& pos);
 
-namespace NNUE {
-class Network;
-struct AccumulatorCaches;
-class AccumulatorStack;
-}
+std::string trace(Position& pos);
 
-std::string trace(Position& pos, const Eval::NNUE::Network& network);
-
-Value evaluate(const NNUE::Network&           network,
-               const Position&                pos,
-               Eval::NNUE::AccumulatorStack&  accumulators,
-               Eval::NNUE::AccumulatorCaches& caches,
-               int                            optimism);
 }  // namespace Eval
 
 }  // namespace Stockfish

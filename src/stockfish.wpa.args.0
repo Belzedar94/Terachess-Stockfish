@@ -1,4 +1,3 @@
-attacks.o
 benchmark.o
 bitboard.o
 evaluate.o
@@ -15,12 +14,6 @@ tt.o
 uci.o
 ucioption.o
 tune.o
-tbprobe.o
-nnue_accumulator.o
-nnue_misc.o
-network.o
-half_ka_v2_hm.o
-full_threats.o
 engine.o
 score.o
 memory.o

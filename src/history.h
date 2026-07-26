@@ -35,7 +35,9 @@
 
 namespace Stockfish {
 
-constexpr int PAWN_HISTORY_BASE_SIZE   = 8192;  // has to be a power of 2
+// ADR (frozen contract): 512 instead of master's 8192 — with PIECE_NB = 64
+// and SQUARE_NB = 256 each pawn-structure entry is 16x master's size.
+constexpr int PAWN_HISTORY_BASE_SIZE   = 512;  // has to be a power of 2
 constexpr int UINT_16_HISTORY_SIZE     = std::numeric_limits<u16>::max() + 1;
 constexpr int CORRHIST_BASE_SIZE       = UINT_16_HISTORY_SIZE;
 constexpr int CORRECTION_HISTORY_LIMIT = 1024;
@@ -134,13 +136,26 @@ using LowPlyHistory = Stats<i16, 7183, LOW_PLY_HISTORY_SIZE, UINT_16_HISTORY_SIZ
 // CapturePieceToHistory is addressed by a move's [piece][to][captured piece type]
 using CapturePieceToHistory = Stats<i16, 10692, PIECE_NB, SQUARE_NB, PIECE_TYPE_NB>;
 
-// PieceToHistory is like ButterflyHistory but is addressed by a move's [piece][to]
-using PieceToHistory = AtomicStats<i16, 30000, PIECE_NB, SQUARE_NB>;
+// Piece bucket for the continuation-indexed tables (frozen contract, FSF
+// PIECE_SLOTS pattern): with 64 Piece codes and 256 squares a full
+// [piece][to] x [piece][to] table would be 512 MiB per instance, so the piece
+// type is hashed into 8 slots per color (type % 8). NO_PIECE maps to slot 0
+// (the search sentinel entries). Retuning of the collisions is F2 work.
+constexpr int PIECE_TYPE_SLOTS = 8;
+constexpr int PIECE_SLOT_NB    = COLOR_NB * PIECE_TYPE_SLOTS;  // 16
+
+constexpr int piece_slot(Piece pc) {
+    return (int(pc) >> 5) * PIECE_TYPE_SLOTS + (int(pc) & 31) % PIECE_TYPE_SLOTS;
+}
+
+// PieceToHistory is like ButterflyHistory but is addressed by a move's
+// [piece_slot(piece)][to]
+using PieceToHistory = AtomicStats<i16, 30000, PIECE_SLOT_NB, SQUARE_NB>;
 
 // ContinuationHistory is the combined history of a given pair of moves, usually
 // the current one given a previous one. The nested history table is based on
 // PieceToHistory instead of ButterflyBoards.
-using ContinuationHistory = MultiArray<PieceToHistory, PIECE_NB, SQUARE_NB>;
+using ContinuationHistory = MultiArray<PieceToHistory, PIECE_SLOT_NB, SQUARE_NB>;
 
 // PawnHistory is addressed by the pawn structure and a move's [piece][to]
 using PawnHistory = DynStats<AtomicStats<i16, 8192, PIECE_NB, SQUARE_NB>, PAWN_HISTORY_BASE_SIZE>;
@@ -174,14 +189,17 @@ namespace Detail {
 template<CorrHistType>
 struct CorrHistTypedef;
 
+// Both correction-history dimensions use piece_slot() indexing (same memory
+// argument as ContinuationHistory; not spelled out in the contract, simple
+// choice documented here). T256-TODO: re-evaluate with corrhist in F2.
 template<>
 struct CorrHistTypedef<PieceTo> {
-    using type = Stats<i16, CORRECTION_HISTORY_LIMIT, PIECE_NB, SQUARE_NB>;
+    using type = Stats<i16, CORRECTION_HISTORY_LIMIT, PIECE_SLOT_NB, SQUARE_NB>;
 };
 
 template<>
 struct CorrHistTypedef<Continuation> {
-    using type = MultiArray<CorrHistTypedef<PieceTo>::type, PIECE_NB, SQUARE_NB>;
+    using type = MultiArray<CorrHistTypedef<PieceTo>::type, PIECE_SLOT_NB, SQUARE_NB>;
 };
 
 }

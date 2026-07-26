@@ -1,286 +1,43 @@
-attacks.o: attacks.cpp attacks.h types.h misc.h tune.h bitboard.h
-benchmark.o: benchmark.cpp benchmark.h numa.h misc.h shm.h types.h tune.h \
- memory.h
+benchmark.o: benchmark.cpp benchmark.h notation.h types.h misc.h tune.h \
+ numa.h shm.h memory.h
 bitboard.o: bitboard.cpp bitboard.h types.h misc.h tune.h
-evaluate.o: evaluate.cpp evaluate.h types.h misc.h tune.h nnue/network.h \
- nnue/../types.h nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../../types.h \
- nnue/layers/../../tune.h nnue/layers/../../misc.h \
- nnue/layers/../nnue_common.h nnue/layers/../simd.h \
- nnue/layers/../../types.h nnue/layers/../nnue_common.h \
- nnue/layers/affine_transform_sparse_input.h nnue/layers/../../bitboard.h \
- nnue/layers/../nnz_helper.h nnue/layers/../simd.h \
- nnue/layers/clipped_relu.h nnue/layers/sqr_clipped_relu.h \
- nnue/nnue_common.h nnue/nnz_helper.h nnue/nnue_feature_transformer.h \
- nnue/../position.h nnue/../attacks.h nnue/../types.h nnue/../bitboard.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/nnue_misc.h position.h uci.h engine.h history.h memory.h numa.h \
- shm.h search.h movegen.h nnue/nnue_accumulator.h score.h \
- syzygy/tbprobe.h timeman.h thread.h thread_win32_osx.h tt.h ucioption.h \
- notation.h
-main.o: main.cpp attacks.h types.h misc.h tune.h bitboard.h position.h \
- uci.h engine.h history.h memory.h nnue/network.h nnue/../types.h \
- nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_misc.h numa.h shm.h search.h movegen.h \
- nnue/nnue_accumulator.h score.h syzygy/tbprobe.h timeman.h thread.h \
- thread_win32_osx.h tt.h ucioption.h notation.h
-notation.o: notation.cpp notation.h types.h misc.h tune.h movegen.h \
- position.h attacks.h bitboard.h
+evaluate.o: evaluate.cpp evaluate.h types.h misc.h tune.h position.h \
+ bitboard.h
+main.o: main.cpp bitboard.h types.h misc.h tune.h position.h uci.h \
+ engine.h history.h memory.h numa.h shm.h search.h movegen.h score.h \
+ timeman.h thread.h thread_win32_osx.h tt.h ucioption.h notation.h
+notation.o: notation.cpp notation.h types.h misc.h tune.h bitboard.h \
+ position.h
 misc.o: misc.cpp misc.h types.h tune.h
-movegen.o: movegen.cpp movegen.h misc.h types.h tune.h attacks.h \
- bitboard.h position.h
+movegen.o: movegen.cpp movegen.h misc.h types.h tune.h bitboard.h \
+ position.h
 movepick.o: movepick.cpp movepick.h history.h memory.h types.h misc.h \
- tune.h position.h attacks.h bitboard.h movegen.h
-position.o: position.cpp position.h attacks.h types.h misc.h tune.h \
- bitboard.h history.h memory.h movegen.h syzygy/tbprobe.h tt.h notation.h
+ tune.h position.h bitboard.h movegen.h
+position.o: position.cpp position.h bitboard.h types.h misc.h tune.h \
+ movegen.h notation.h tt.h memory.h
 search.o: search.cpp search.h history.h memory.h types.h misc.h tune.h \
- position.h attacks.h bitboard.h movegen.h nnue/network.h nnue/../types.h \
- nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_accumulator.h numa.h shm.h score.h \
- syzygy/tbprobe.h timeman.h evaluate.h movepick.h thread.h \
- thread_win32_osx.h tt.h uci.h engine.h nnue/nnue_misc.h ucioption.h \
- notation.h
-thread.o: thread.cpp thread.h memory.h types.h misc.h tune.h numa.h shm.h \
- position.h attacks.h bitboard.h search.h history.h movegen.h \
- nnue/network.h nnue/../types.h nnue/../tune.h nnue/../misc.h \
- nnue/nnue_architecture.h nnue/features/half_ka_v2_hm.h \
- nnue/features/../../misc.h nnue/features/../../types.h \
- nnue/features/../../tune.h nnue/features/../nnue_common.h \
- nnue/features/../../misc.h nnue/features/full_threats.h \
- nnue/layers/affine_transform.h nnue/layers/../../memory.h \
- nnue/layers/../nnue_common.h nnue/layers/../simd.h \
- nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_accumulator.h score.h syzygy/tbprobe.h \
- timeman.h thread_win32_osx.h uci.h engine.h nnue/nnue_misc.h tt.h \
+ position.h bitboard.h movegen.h numa.h shm.h score.h timeman.h \
+ evaluate.h movepick.h thread.h thread_win32_osx.h tt.h uci.h engine.h \
  ucioption.h notation.h
+thread.o: thread.cpp thread.h memory.h types.h misc.h tune.h numa.h shm.h \
+ position.h bitboard.h search.h history.h movegen.h score.h timeman.h \
+ thread_win32_osx.h uci.h engine.h tt.h ucioption.h notation.h
 timeman.o: timeman.cpp timeman.h misc.h search.h history.h memory.h \
- types.h tune.h position.h attacks.h bitboard.h movegen.h nnue/network.h \
- nnue/../types.h nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_accumulator.h numa.h shm.h score.h \
- syzygy/tbprobe.h ucioption.h
-tt.o: tt.cpp tt.h misc.h memory.h types.h tune.h syzygy/tbprobe.h \
- thread.h numa.h shm.h position.h attacks.h bitboard.h search.h history.h \
- movegen.h nnue/network.h nnue/../types.h nnue/../tune.h nnue/../misc.h \
- nnue/nnue_architecture.h nnue/features/half_ka_v2_hm.h \
- nnue/features/../../misc.h nnue/features/../../types.h \
- nnue/features/../../tune.h nnue/features/../nnue_common.h \
- nnue/features/../../misc.h nnue/features/full_threats.h \
- nnue/layers/affine_transform.h nnue/layers/../../memory.h \
- nnue/layers/../nnue_common.h nnue/layers/../simd.h \
- nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_accumulator.h score.h timeman.h \
+ types.h tune.h position.h bitboard.h movegen.h numa.h shm.h score.h \
+ ucioption.h
+tt.o: tt.cpp tt.h misc.h memory.h types.h tune.h thread.h numa.h shm.h \
+ position.h bitboard.h search.h history.h movegen.h score.h timeman.h \
  thread_win32_osx.h
 uci.o: uci.cpp uci.h engine.h misc.h history.h memory.h types.h tune.h \
- position.h attacks.h bitboard.h nnue/network.h nnue/../types.h \
- nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_misc.h numa.h shm.h search.h movegen.h \
- nnue/nnue_accumulator.h score.h syzygy/tbprobe.h timeman.h thread.h \
- thread_win32_osx.h tt.h ucioption.h notation.h benchmark.h
+ position.h bitboard.h numa.h shm.h search.h movegen.h score.h timeman.h \
+ thread.h thread_win32_osx.h tt.h ucioption.h notation.h benchmark.h
 ucioption.o: ucioption.cpp ucioption.h misc.h
 tune.o: tune.cpp tune.h misc.h ucioption.h
-tbprobe.o: syzygy/tbprobe.cpp syzygy/tbprobe.h syzygy/../attacks.h \
- syzygy/../types.h syzygy/../misc.h syzygy/../tune.h syzygy/../bitboard.h \
- syzygy/../bitboard.h syzygy/../misc.h syzygy/../movegen.h \
- syzygy/../position.h syzygy/../attacks.h syzygy/../search.h \
- syzygy/../history.h syzygy/../memory.h syzygy/../position.h \
- syzygy/../movegen.h syzygy/../nnue/network.h syzygy/../nnue/../types.h \
- syzygy/../nnue/../tune.h syzygy/../nnue/../misc.h \
- syzygy/../nnue/nnue_architecture.h \
- syzygy/../nnue/features/half_ka_v2_hm.h \
- syzygy/../nnue/features/../../misc.h \
- syzygy/../nnue/features/../../types.h \
- syzygy/../nnue/features/../../tune.h \
- syzygy/../nnue/features/../nnue_common.h \
- syzygy/../nnue/features/../../misc.h \
- syzygy/../nnue/features/full_threats.h \
- syzygy/../nnue/layers/affine_transform.h \
- syzygy/../nnue/layers/../../memory.h \
- syzygy/../nnue/layers/../nnue_common.h syzygy/../nnue/layers/../simd.h \
- syzygy/../nnue/layers/../../types.h syzygy/../nnue/layers/../../tune.h \
- syzygy/../nnue/layers/../nnue_common.h \
- syzygy/../nnue/layers/affine_transform_sparse_input.h \
- syzygy/../nnue/layers/../../bitboard.h \
- syzygy/../nnue/layers/../nnz_helper.h syzygy/../nnue/layers/../simd.h \
- syzygy/../nnue/layers/clipped_relu.h \
- syzygy/../nnue/layers/sqr_clipped_relu.h syzygy/../nnue/nnue_common.h \
- syzygy/../nnue/nnz_helper.h syzygy/../nnue/nnue_feature_transformer.h \
- syzygy/../nnue/../position.h syzygy/../nnue/nnue_accumulator.h \
- syzygy/../nnue/simd.h syzygy/../nnue/nnue_misc.h \
- syzygy/../nnue/../evaluate.h syzygy/../nnue/../types.h \
- syzygy/../nnue/nnue_accumulator.h syzygy/../numa.h syzygy/../shm.h \
- syzygy/../score.h syzygy/../syzygy/tbprobe.h syzygy/../timeman.h \
- syzygy/../types.h syzygy/../ucioption.h
-nnue_accumulator.o: nnue/nnue_accumulator.cpp nnue/nnue_accumulator.h \
- nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/../misc.h \
- nnue/nnue_architecture.h nnue/features/half_ka_v2_hm.h \
- nnue/features/../../misc.h nnue/features/../../types.h \
- nnue/features/../../tune.h nnue/features/../nnue_common.h \
- nnue/features/../../misc.h nnue/features/full_threats.h \
- nnue/layers/affine_transform.h nnue/layers/../../memory.h \
- nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../../misc.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/../bitboard.h nnue/../position.h nnue/../attacks.h nnue/../types.h \
- nnue/../bitboard.h nnue/nnue_feature_transformer.h nnue/simd.h
-nnue_misc.o: nnue/nnue_misc.cpp nnue/nnue_misc.h nnue/../misc.h \
- nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../../types.h \
- nnue/layers/../../tune.h nnue/layers/../../misc.h \
- nnue/layers/../nnue_common.h nnue/layers/../simd.h \
- nnue/layers/../../types.h nnue/layers/../nnue_common.h \
- nnue/layers/affine_transform_sparse_input.h nnue/layers/../../bitboard.h \
- nnue/layers/../nnz_helper.h nnue/layers/../simd.h \
- nnue/layers/clipped_relu.h nnue/layers/sqr_clipped_relu.h \
- nnue/nnue_common.h nnue/nnz_helper.h nnue/../evaluate.h nnue/../types.h \
- nnue/../position.h nnue/../attacks.h nnue/../bitboard.h nnue/../uci.h \
- nnue/../engine.h nnue/../history.h nnue/../memory.h nnue/../position.h \
- nnue/../nnue/network.h nnue/../nnue/../types.h nnue/../nnue/../tune.h \
- nnue/../nnue/../misc.h nnue/../nnue/nnue_architecture.h \
- nnue/../nnue/nnue_feature_transformer.h nnue/../nnue/../position.h \
- nnue/../nnue/nnue_accumulator.h nnue/../nnue/nnue_common.h \
- nnue/../nnue/simd.h nnue/../nnue/nnue_misc.h nnue/../nnue/nnue_misc.h \
- nnue/../numa.h nnue/../shm.h nnue/../search.h nnue/../movegen.h \
- nnue/../nnue/nnue_accumulator.h nnue/../score.h nnue/../syzygy/tbprobe.h \
- nnue/../timeman.h nnue/../thread.h nnue/../thread_win32_osx.h \
- nnue/../tt.h nnue/../ucioption.h nnue/../notation.h nnue/network.h \
- nnue/nnue_accumulator.h
-network.o: nnue/network.cpp nnue/network.h nnue/../types.h nnue/../misc.h \
- nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../../types.h \
- nnue/layers/../../tune.h nnue/layers/../../misc.h \
- nnue/layers/../nnue_common.h nnue/layers/../simd.h \
- nnue/layers/../../types.h nnue/layers/../nnue_common.h \
- nnue/layers/affine_transform_sparse_input.h nnue/layers/../../bitboard.h \
- nnue/layers/../nnz_helper.h nnue/layers/../simd.h \
- nnue/layers/clipped_relu.h nnue/layers/sqr_clipped_relu.h \
- nnue/nnue_common.h nnue/nnz_helper.h nnue/nnue_feature_transformer.h \
- nnue/../position.h nnue/../attacks.h nnue/../types.h nnue/../bitboard.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../incbin/incbin.h
-half_ka_v2_hm.o: nnue/features/half_ka_v2_hm.cpp \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../misc.h \
- nnue/features/../../tune.h nnue/features/../nnue_common.h \
- nnue/features/../../misc.h
-full_threats.o: nnue/features/full_threats.cpp \
- nnue/features/full_threats.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../misc.h \
- nnue/features/../../tune.h nnue/features/../nnue_common.h \
- nnue/features/../../misc.h nnue/features/../../attacks.h \
- nnue/features/../../types.h nnue/features/../../bitboard.h \
- nnue/features/../../bitboard.h nnue/features/../../position.h \
- nnue/features/../../attacks.h
 engine.o: engine.cpp engine.h misc.h history.h memory.h types.h tune.h \
- position.h attacks.h bitboard.h nnue/network.h nnue/../types.h \
- nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_misc.h numa.h shm.h search.h movegen.h \
- nnue/nnue_accumulator.h score.h syzygy/tbprobe.h timeman.h thread.h \
- thread_win32_osx.h tt.h ucioption.h evaluate.h nnue/nnue_common.h \
- perft.h notation.h uci.h
+ position.h bitboard.h numa.h shm.h search.h movegen.h score.h timeman.h \
+ thread.h thread_win32_osx.h tt.h ucioption.h evaluate.h perft.h \
+ notation.h uci.h
 score.o: score.cpp score.h types.h misc.h tune.h uci.h engine.h history.h \
- memory.h position.h attacks.h bitboard.h nnue/network.h nnue/../types.h \
- nnue/../tune.h nnue/../misc.h nnue/nnue_architecture.h \
- nnue/features/half_ka_v2_hm.h nnue/features/../../misc.h \
- nnue/features/../../types.h nnue/features/../../tune.h \
- nnue/features/../nnue_common.h nnue/features/../../misc.h \
- nnue/features/full_threats.h nnue/layers/affine_transform.h \
- nnue/layers/../../memory.h nnue/layers/../nnue_common.h \
- nnue/layers/../simd.h nnue/layers/../../types.h nnue/layers/../../tune.h \
- nnue/layers/../nnue_common.h nnue/layers/affine_transform_sparse_input.h \
- nnue/layers/../../bitboard.h nnue/layers/../nnz_helper.h \
- nnue/layers/../simd.h nnue/layers/clipped_relu.h \
- nnue/layers/sqr_clipped_relu.h nnue/nnue_common.h nnue/nnz_helper.h \
- nnue/nnue_feature_transformer.h nnue/../position.h \
- nnue/nnue_accumulator.h nnue/simd.h nnue/nnue_misc.h nnue/../evaluate.h \
- nnue/../types.h nnue/nnue_misc.h numa.h shm.h search.h movegen.h \
- nnue/nnue_accumulator.h syzygy/tbprobe.h timeman.h thread.h \
- thread_win32_osx.h tt.h ucioption.h notation.h
+ memory.h position.h bitboard.h numa.h shm.h search.h movegen.h timeman.h \
+ thread.h thread_win32_osx.h tt.h ucioption.h notation.h
 memory.o: memory.cpp memory.h types.h misc.h tune.h

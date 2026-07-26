@@ -20,52 +20,114 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 
-#include "movegen.h"
+#include "bitboard.h"
 #include "position.h"
 
 namespace Stockfish::Notation {
 
 std::string square(Square s) {
-    return std::string{char('a' + file_of(s)), char('1' + rank_of(s))};
+    return char('a' + file_of(s)) + std::to_string(1 + rank_of(s));
 }
 
-std::string move(Move m, bool chess960) {
+std::string move(Move m) {
     if (m == Move::none())
         return "(none)";
 
     if (m == Move::null())
         return "0000";
 
-    Square from = m.from_sq();
-    Square to   = m.to_sq();
+    std::string str = square(m.from_sq()) + square(m.to_sq());
 
-    if (m.type_of() == CASTLING && !chess960)
-        to = make_square(to > from ? FILE_G : FILE_C, rank_of(from));
-
-    std::string move = square(from) + square(to);
-
-    if (m.type_of() == PROMOTION)
-        move += " pnbrqk"[m.promotion_type()];
-
-    return move;
-}
-
-std::string to_lower(std::string str) {
-    std::transform(str.begin(), str.end(), str.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    // The promotion suffix is redundant (spec 6.4: forced and deterministic)
+    // but always emitted, in lowercase (spec 11)
+    if (m.is_promotion())
+        str += PieceTypeToChar[m.promotion_type()];
 
     return str;
 }
 
+std::string to_lower(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+                   [](unsigned char c) { return char(std::tolower(c)); });
+
+    return str;
+}
+
+// Builds a Move from coordinate notation using the position context (piece on
+// the origin square, ep square) to select the special-move type and to derive
+// or cross-check the forced promotion (spec 11). Geometry and legality are NOT
+// fully validated here: the caller must vet the move (stage 4: against the
+// generated move list).
 Move to_move(const Position& pos, std::string str) {
     str = to_lower(str);
 
-    for (const auto& m : MoveList<LEGAL>(pos))
-        if (str == move(m, pos.is_chess960()))
-            return m;
+    if (str == "0000")
+        return Move::null();
 
-    return Move::none();
+    usize i = 0;
+
+    auto parse_square = [&](Square& out) {
+        if (i >= str.size() || str[i] < 'a' || str[i] > 'p')
+            return false;
+        const File f = File(str[i++] - 'a');
+        if (i >= str.size() || !isdigit(static_cast<unsigned char>(str[i])))
+            return false;
+        int r = str[i++] - '0';
+        if (i < str.size() && isdigit(static_cast<unsigned char>(str[i])))
+            r = r * 10 + (str[i++] - '0');
+        if (r < 1 || r > 16)
+            return false;
+        out = make_square(f, Rank(r - 1));
+        return true;
+    };
+
+    Square from, to;
+    if (!parse_square(from) || !parse_square(to) || from == to)
+        return Move::none();
+
+    PieceType promo = NO_PIECE_TYPE;
+    if (i < str.size())
+    {
+        promo = piece_type_from_char(str[i++]);
+        if (promo == NO_PIECE_TYPE || i != str.size())
+            return Move::none();
+    }
+
+    const Piece pc = pos.piece_on(from);
+    if (pc == NO_PIECE || color_of(pc) != pos.side_to_move())
+        return Move::none();
+
+    const Color     us = color_of(pc);
+    const PieceType pt = type_of(pc);
+
+    // Arrival kinds that matter for the Troll promotion rule (spec 6.4)
+    const bool pawnStep =
+      int(to) - int(from) == int(pawn_push(us)) || bool(PawnAttacks[us][from] & to);
+
+    // Cross-check an explicit promotion suffix against the forced table
+    if (promo != NO_PIECE_TYPE
+        && (relative_rank(us, to) != RANK_16 || promo != promoted_piece_type(pt)
+            || (pt == TROLL && !pawnStep)))
+        return Move::none();
+
+    // En passant: a pawn capture landing on the ep square (spec 6.2)
+    if (pt == PAWN && to == pos.ep_square() && bool(PawnAttacks[us][from] & to))
+        return Move::make<EN_PASSANT>(from, to);
+
+    // King jump: a distance-2 king move is only reachable that way (spec 6.3,
+    // spec 11: distinguished by context)
+    const int df = std::abs(file_of(to) - file_of(from));
+    const int dr = std::abs(rank_of(to) - rank_of(from));
+    if (pt == KING && std::max(df, dr) == 2)
+        return Move::make<KING_JUMP>(from, to);
+
+    // Derive the forced promotion when the suffix was omitted
+    if (promo == NO_PIECE_TYPE && relative_rank(us, to) == RANK_16 && (pt != TROLL || pawnStep))
+        promo = promoted_piece_type(pt);  // NO_PIECE_TYPE for non-promoting pieces
+
+    return Move::make<NORMAL>(from, to, promo);
 }
 
 }  // namespace Stockfish::Notation

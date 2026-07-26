@@ -217,15 +217,15 @@ ExtMove* MovePicker::score(const Move* begin, const Move* end) {
 
     Color us = pos.side_to_move();
 
-    [[maybe_unused]] Bitboard threatByLesser[KING + 1];
+    // T256-TODO(F2): threat tiers only cover the orthodox piece types for now;
+    // the other 20 types get an empty set (no bonus/penalty), no retuning in F1.
+    [[maybe_unused]] Bitboard threatByLesser[KING + 1] = {};
     if constexpr (Type == QUIETS)
     {
-        threatByLesser[PAWN]   = 0;
         threatByLesser[KNIGHT] = threatByLesser[BISHOP] = pos.attacks_by<PAWN>(~us);
         threatByLesser[ROOK] =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatByLesser[KNIGHT];
         threatByLesser[QUEEN] = pos.attacks_by<ROOK>(~us) | threatByLesser[ROOK];
-        threatByLesser[KING]  = 0;
     }
 
 
@@ -250,14 +250,15 @@ ExtMove* MovePicker::score(const Move* begin, const Move* end) {
             // histories
             m.value = 2 * (*mainHistory)[us][m.raw() & 0xFFFF];
             m.value += 2 * sharedHistory->pawn_entry(pos)[pc][to];
-            m.value += (*continuationHistory[0])[pc][to];
-            m.value += (*continuationHistory[1])[pc][to];
-            m.value += (*continuationHistory[2])[pc][to];
-            m.value += (*continuationHistory[3])[pc][to];
-            m.value += (*continuationHistory[5])[pc][to];
+            m.value += (*continuationHistory[0])[piece_slot(pc)][to];
+            m.value += (*continuationHistory[1])[piece_slot(pc)][to];
+            m.value += (*continuationHistory[2])[piece_slot(pc)][to];
+            m.value += (*continuationHistory[3])[piece_slot(pc)][to];
+            m.value += (*continuationHistory[5])[piece_slot(pc)][to];
 
-            // bonus for checks
-            m.value += ((pos.check_squares(pt) & to) && pos.see_ge(m, -75)) * 16384;
+            // T256-TODO(F2): master adds a bonus for checking moves here via
+            // pos.check_squares(pt); that precomputed table was removed with
+            // the pin machinery (frozen contract), so the bonus is gone in F1.
 
             // penalty for moving to a square threatened by a lesser piece
             // or bonus for escaping an attack by a lesser piece.
@@ -273,7 +274,8 @@ ExtMove* MovePicker::score(const Move* begin, const Move* end) {
             if (pos.capture_stage(m))
                 m.value = PieceValue[capturedPiece] + (1 << 28);
             else
-                m.value = (*mainHistory)[us][m.raw() & 0xFFFF] + (*continuationHistory[0])[pc][to];
+                m.value = (*mainHistory)[us][m.raw() & 0xFFFF]
+                        + (*continuationHistory[0])[piece_slot(pc)][to];
         }
     }
     return it;

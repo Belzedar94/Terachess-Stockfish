@@ -35,7 +35,6 @@
 #include "memory.h"
 #include "movegen.h"
 #include "search.h"
-#include "syzygy/tbprobe.h"
 #include "timeman.h"
 #include "types.h"
 #include "uci.h"
@@ -112,8 +111,6 @@ void Thread::run_custom_job(std::function<void()> f) {
     }
     cv.notify_one();
 }
-
-void Thread::ensure_network_replicated() { worker->ensure_network_replicated(); }
 
 // Thread gets parked here, blocked on the condition variable
 // when the thread has no work to do.
@@ -286,7 +283,7 @@ usize ThreadPool::num_threads() const { return threads.size(); }
 
 // Wakes up main thread waiting in idle_loop() and returns immediately.
 // Main thread will wake up other threads and start the search.
-void ThreadPool::start_thinking(const OptionsMap&  options,
+void ThreadPool::start_thinking(const OptionsMap&,
                                 Position&          pos,
                                 StateListPtr&      states,
                                 Search::LimitsType limits) {
@@ -313,8 +310,6 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
         for (const auto& m : legalmoves)
             rootMoves.emplace_back(m);
 
-    Tablebases::Config tbConfig = Tablebases::rank_root_moves(options, pos, rootMoves);
-
     // After ownership transfer 'states' becomes empty, so if we stop the search
     // and call 'go' again without setting a new position states.get() == nullptr.
     assert(states.get() || setupStates.get());
@@ -335,9 +330,8 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
             th->worker->nmpMinPly                                                = 0;
             th->worker->rootDepth                                                = 0;
             th->worker->rootMoves                                                = rootMoves;
-            th->worker->rootPos.set(pos.fen(), pos.is_chess960(), &th->worker->rootState);
+            th->worker->rootPos.set(pos.fen(), &th->worker->rootState);
             th->worker->rootState = setupStates->back();
-            th->worker->tbConfig  = tbConfig;
         });
     }
 
@@ -447,11 +441,6 @@ usize ThreadPool::numa_nodes() const {
     for (NumaIndex n : boundThreadToNumaNode)
         seen.insert(n);
     return std::max(seen.size(), usize(1));
-}
-
-void ThreadPool::ensure_network_replicated() {
-    for (auto&& th : threads)
-        th->ensure_network_replicated();
 }
 
 }  // namespace Stockfish
