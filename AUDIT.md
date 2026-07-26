@@ -261,4 +261,40 @@ SPRT muy eficiente en esta variante.
 
 **Limitación operativa detectada**: el runner de partidas es secuencial (23 s
 por partida) ⇒ un SPRT de 5.000 partidas serían ~32 h. Necesita paralelismo
-antes de F4; anotado como tarea.
+antes de F4; anotado como tarea. **Resuelto el mismo día**:
+`tools/parallel_match.py` (N procesos con semillas disjuntas) — 5.000 partidas
+bajan a ~1,6 h con 20 procesos.
+
+---
+
+## 2026-07-19 — CADENA COMPLETA VALIDADA CON DATOS REALES
+
+**Hipótesis**: los componentes verificados por separado (datagen, formato,
+auditor, trainer) componen sin sorpresas cuando los datos son reales y no
+sintéticos.
+
+**Evidencia** (campaña 1 en curso, instantánea al 20 %):
+- Muestra de un shard vivo: **16.607/16.607 registros válidos**, 0 corruptos,
+  todos `pack(unpack(raw)) == raw`. Resultados parcheados: 0 registros con
+  "sin resultado". Distribución WDL 40/21/40, |score| ≤1.691 (respeta el
+  eval_limit), media 17,9 cp.
+- `merge_shards.py` (nuevo): instantánea de los 20 shards →
+  **407.839 registros, 1.160 partidas, 341,8 registros/partida**,
+  `audit_terabin.py --strict` **exit 0, 0 avisos**, tamaño exacto.
+- **Trainer sobre datos REALES** (no sintéticos): entrena en CUDA, loss
+  descendente (9,27e-4 → 5,32e-4 en 60 pasos), checkpoint escrito.
+- **Export TNN1 desde datos reales**: 56.858.966 B (56,86 MB), recarga
+  verificada **bit-exacta**, pesos dentro de rango (|bias FT| máx 3 de 8.191;
+  |psqt| máx 746) — la garantía anti-overflow del contrato se cumple con
+  margen amplio en datos reales.
+
+**Decisión**: la cadena datagen→formato→auditor→trainer→TNN1 queda cerrada.
+Falta el último eslabón (motor↔red) y su gate de paridad ==0 cp, en curso.
+Entrenando en paralelo una red preliminar sobre los 408 k registros para tener
+artefacto real con el que ejecutar el gate en cuanto el motor lo soporte.
+
+**Learning**: haber congelado el formato y el contrato de red ANTES de escribir
+nada permitió que tres implementaciones independientes (datagen C++, terabin
+Python, trainer PyTorch) compusieran a la primera. El único choque —la
+contradicción fc0 512 vs 256— lo detectó la verificación cruzada del trainer
+contra el propio contrato, antes de entrenar ninguna red real.
