@@ -378,6 +378,45 @@ correcto.
 
 ---
 
+## 2026-07-19 — **GATE FASE 3: PASS** — net-1 gana +330 Elo al material
+
+| red | datos | partidas | W/L/D | Elo | paridad | veredicto |
+|---|---|---|---|---|---|---|
+| net1pre | 408 k (unidades malas) | 160 | +8 −152 =0 | −511,5 ± 63,0 | 0 cp | FAIL |
+| netA | 220 k | 120 | +5 −115 =0 | −544,7 ± 79,4 | 0 cp | FAIL |
+| **tera-net1** | **1.522.654** | **100** | **+87 −13 =0** | **+330,2 ± 51,7** | **0 cp** | **PASS** |
+
+Umbral del gate: ≥+100 Elo. Obtenido: **+330**, tres veces el listón, con
+0 tablas y 0 anomalías en 100 partidas arbitradas por el oráculo.
+
+**Artefacto**: `tera-net1.tnn`, 56.858.966 B,
+sha256 `6bb5cd483f5a514e970eac129999f4a261e2a700f2d300cf808afe4fb71d6d3d`.
+Procedencia: campaña 3 (`datagen … nodes 8000 threads 24 seed 777
+write_min_ply 6`), 1.522.654 registros de 4.183 partidas, auditados con
+`--strict` sin avisos, gate de unidades con pendiente 1,004; entrenamiento
+6 épocas, batch 1024, λ=1,0, val loss 8,72e-4 → 6,81e-4 (monótona).
+
+**Calidad medida de la red** (`tools/data_scaling.py`, posiciones frescas del
+oráculo jamás vistas): correlación con el material **0,937** (era 0,796 con
+370 k), error mediano **133 cp** (era 170), dispersión 489 frente a 548 del
+material, brecha entrenamiento↔frescas reducida de 0,15 a 0,055.
+
+**Corrección de mi propio razonamiento, registrada por instructiva**: en la
+iteración 2 argumenté que la red necesitaba reproducir el material *casi
+exactamente* para empatar, y extrapolé 4,5 M (luego 36 M con el punto nuevo)
+posiciones para bajar de 1 peón de error. **La premisa era falsa**: con 2,7
+peones de error mediano la red ya gana 330 Elo, porque el conocimiento
+posicional destilado de la búsqueda domina el ruido de aproximación mucho antes
+de lo supuesto. Entre 370 k y 1,52 M hay una **transición de fase**
+(−545 → +330 Elo), no una rampa. La extrapolación log-lineal describía bien el
+error de aproximación pero era **irrelevante como predictor de fuerza**.
+
+**Learning transferible**: al elegir la métrica proxy de un gate caro, verificar
+que la proxy y el gate se mueven juntos. "Error de aproximación al maestro" era
+medible y barato, pero no monótono con el Elo en el rango que importaba.
+
+---
+
 ## 2026-07-19 — F3 GATE DE FUERZA, iteración 2: **FAIL** (−545 Elo) — causa medida
 
 Con unidades ya correctas (gate de unidades PASS, pendiente 1,012) y paridad

@@ -1,4 +1,27 @@
-# Autopsia de net-1: por qué la red piloto pierde contra el material
+# Autopsia de net-1: del −545 Elo al +330 Elo
+
+> **DESENLACE (2026-07-19, posterior a todo lo que sigue)**: la hipótesis
+> "faltan datos" se confirmó y **net-1 pasó el gate**. Con **1.522.654
+> registros** (4× los 370 k de la última iteración fallida):
+> **+87 −13 =0, +330,2 ± 51,7 Elo** contra la evaluación material — el triple
+> del umbral exigido (+100). Paridad 0 cp sobre 600 posiciones.
+> Red promovida a `tera-net1.tnn`, sha256 `6bb5cd48…b71d6d3d`.
+>
+> **Corrección importante a mi propio razonamiento**, registrada porque la
+> equivocación es instructiva: yo supuse que la red debía reproducir el material
+> *casi exactamente* para empatar, y extrapolé que hacían falta ~4,5 M (luego
+> ~36 M) posiciones para bajar de 1 peón de error. **Falso.** Con 133 cp de
+> error mediano (2,7 peones) y correlación 0,937, la red ya gana 330 Elo: el
+> conocimiento posicional destilado de la búsqueda **domina** al ruido de
+> aproximación mucho antes de lo que suponía. Entre 370 k y 1,52 M hay una
+> transición de fase (−545 → +330 Elo), no una rampa suave.
+>
+> Lo que sigue es el diagnóstico tal y como se hizo, con sus predicciones
+> —incluidas las que resultaron erróneas— sin retocar.
+
+---
+
+## (histórico) Por qué la red piloto perdía contra el material
 
 **Veredicto**: gate de fuerza F3 **FAIL** en las dos iteraciones. Causa raíz
 identificada y **cuantificada**: el volumen de datos está 12–80× por debajo de
