@@ -106,6 +106,37 @@ Registrado como deuda técnica explícita, no como gate superado.
 
 ---
 
+## 3bis. Longitud y decisividad de las partidas — **MEDIDO (dato fundacional)**
+
+Piloto de 6 partidas self-play a 10 k nodos, cap de 1.200 plies, sin
+adjudicación (`tools/`, oráculo como árbitro):
+
+| Partida | Plies | Final | Piezas restantes |
+|---|---|---|---|
+| 0 | 842 | 0-1 (mate) | 7 |
+| 1 | 473 | 1-0 (mate) | 51 |
+| 2 | 380 | 0-1 (mate) | 58 |
+| 3 | 639 | 1-0 (mate) | 29 |
+| 4 | 631 | 1-0 (mate) | 20 |
+| 5 | 483 | 1-0 (mate) | 34 |
+
+**Media 575 plies (~287 jugadas). 6/6 decisivas por mate real, 0 tablas.**
+~18 s por partida a 10 k nodos y 1 hilo.
+
+Consecuencias operativas:
+1. **Cualquier cap por debajo de ~800 plies fabrica tablas artificiales.** Una
+   medición previa con cap 300 dio 100 % de tablas y era un artefacto del cap,
+   no una propiedad del juego. Regla: cap ≥1.000 plies en toda sonda y SPRT.
+2. La tasa de tablas real es baja (consistente con la predicción del plan <10 %)
+   ⇒ SPRT eficiente: cada partida informa ~2× lo que una de ajedrez
+   (1 nElo ≈ 2 Elo). Se mantienen bounds en Elo crudo [1, 6].
+3. Coste por SPRT estimado: 5.000 partidas × ~18 s ≈ 25 h monohilo ⇒ ~1 h con
+   24 hilos en paralelo. Presupuesto viable.
+4. Una partida de ~575 plies genera del orden de 300–500 registros tras filtros
+   ⇒ el datagen es eficiente por partida aunque cada partida sea larga.
+5. La adjudicación por evaluación es **opcional** (red de seguridad), no
+   necesaria para resolver partidas. Se deja en |eval| ≥5.000 cp × 6 jugadas.
+
 ## 4. Historiales bucketed — **RIESGO MEDIO, aceptado con evidencia pendiente**
 
 `ContinuationHistory` naïve en 256 casillas serían ~2 GiB. Se implementó
