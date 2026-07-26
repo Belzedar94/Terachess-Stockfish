@@ -376,6 +376,54 @@ mecanismo de la sonda antes de creer su resultado*. Coste: 15 minutos; sin la
 comprobación habría sido una "corrección" de un bug inexistente sobre código
 correcto.
 
+---
+
+## 2026-07-19 — F3 GATE DE FUERZA, iteración 2: **FAIL** (−545 Elo) — causa medida
+
+Con unidades ya correctas (gate de unidades PASS, pendiente 1,012) y paridad
+0 cp sobre 800 posiciones, la red netA (220 k registros) vuelve a perder:
+**+5 −115 =0, −544,7 ± 79,4 Elo** en 120 partidas.
+
+**Diagnóstico cuantitativo** (`docs/net1-postmortem.md`, herramienta
+`tools/data_scaling.py`): se entrenaron cuatro redes y se midió su acuerdo con
+la evaluación material sobre posiciones **frescas generadas por el oráculo**,
+jamás vistas en entrenamiento:
+
+| Datos | corr entrenamiento | corr frescas | error mediano frescas |
+|---|---|---|---|
+| 90 k | 0,754 | 0,368 | 244 cp |
+| 180 k | 0,882 | 0,579 | 226 cp |
+| 220 k | 0,934 | 0,692 | 210 cp |
+| 370 k | 0,979 | 0,796 | 170 cp |
+
+Mejora monótona con los datos, con la factorización activa en todas. Brecha
+entrenamiento↔frescas de 0,18 a 370 k: **sobreajuste medido** (26,7 M pesos
+frente a 370 k posiciones).
+
+**Por qué son −545 y no −20**: el maestro es material **exacto**. La red no
+tiene otra fuente de conocimiento que superar, así que para empatar debe
+reproducirlo casi perfectamente. Con 170 cp (3,4 peones) de error mediano en
+posiciones nuevas, el ruido de la aproximación aplasta cualquier señal
+posicional destilada por la búsqueda.
+
+**Extrapolación falsable**: `err ≈ 839 − 119·log10(N)` ⇒ **~4,5 M posiciones**
+para bajar de 1 peón de error, ~10 M para que el ruido deje de dominar
+(6–14 h de torre a 200 pos/s). Coincide en orden de magnitud con los 20–30 M
+que el propio plan fijó para net-1.
+
+**Decisión (regla predeclarada del plan)**: la auditoría de la cadena
+índices→forward exigida por el criterio de abandono **está hecha y sale
+limpia**, así que no hay código que arreglar. Se detiene el entrenamiento a
+escala piloto y se lanza campaña de régimen (6 M posiciones, 24 hilos, 8 k
+nodos). **El gate de +100 Elo no se relaja**: cambia el insumo, no el listón.
+
+**Aviso metodológico**: dos veces en esta sesión una sonda mal construida casi
+produce una conclusión falsa (el `quit` que abortaba la búsqueda; un filtro que
+capturaba dos líneas por posición y desalineaba los pares, dando correlación
+0,202 donde había 0,975). Ambas se detectaron por incoherencia con mediciones
+previas. Regla reforzada: **toda sonda nueva se contrasta contra una medición
+ya validada antes de creer su resultado**.
+
 **Learnings**: (1) un nombre de campo mentiroso heredado del upstream
 (`InternalUnits` conteniendo cp convertidos) costó una red y ~4 horas de CPU;
 (2) el gate de paridad ==0 cp verifica que dos implementaciones **coinciden**,
