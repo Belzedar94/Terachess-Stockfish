@@ -1026,6 +1026,14 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
    de recibir la respuesta. No se extrajeron ni reutilizaron credenciales: la
    evidencia aceptada es el recibo v41 recomputado en servidor y los bytes
    descargados/rehasheados por SSH.
+8. Después de completar #353 apareció una segunda pausa local, distinta de la
+   primera: `openbench.exit` creado a las **16:04:42 CEST**, **2 B** `0d0a`, y
+   el supervisor histórico PID **31872** ya no existía; tampoco quedaba ningún
+   `client.py`. Como no hay workload Terachess activo y la combinación flag +
+   supervisor terminado indica una intervención concurrente que puede ser
+   intencional, no se retiró el flag ni se relanzó el worker por segunda vez.
+   Restaurar T24 requiere confirmar el nuevo estado operativo con el
+   propietario; no se entra en una carrera contra otro operador.
 
 **Decisión**: los gates de datos del canary #353 son **PASS** sin relajaciones.
 La campaña de 10 M sigue **BLOQUEADA** por un único gate declarado antes del
