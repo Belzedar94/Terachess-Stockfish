@@ -926,6 +926,18 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
   La publicación congela net-2 en **56.858.966 B**, SHA-256
   `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`,
   startpos builtin y productor obligatorio.
+- Build local limpio del `git archive` de `711177d…`, bajo el contrato
+  OpenBench (`OPENBENCH_DATAGEN=1`, `GIT_SHA_FULL` exacto, `EVALFILE` net-2),
+  GCC **16.1.0**, `-j2`, BMI2 y sin PGO: exit **0**. El compilador recibió
+  `TERA_SOURCE_COMMIT` completo y `TERA_SOURCE_DIRTY=0`; binario
+  **4.326.374 B**, SHA-256
+  `7f31a51d4515387b87e791194ac4d7647109a1ba5f5eca12b4aee6d4143479b4`.
+  El arnés de identidad reprodujo 5/5 negativos con exit 1 y 0 artefactos;
+  positivo **4/4**, audit 0 warnings, round-trip 4/4, procedencia y resume
+  exactos. Bench net-2 **32.541 ×4**, NPS **118.762, 103.304, 123.730 y
+  123.730** bajo el worker T24. Antes de usar este binario en el canary, la
+  sonda de unidades reprodujo la medición conocida de `c3_final`: NNUE
+  **150/150**, pendiente **1,044**, correlación **0,991**, PASS.
 - Orden observado sin mutaciones adicionales: Spell #351 ya había terminado
   por bound alto; #353 era la única carga activa con prioridad **302**. El
   worker T24 conservó PID **27540** y su comando `-T 24 -N 1`; estaba
@@ -956,6 +968,13 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
    **1** y no escribió DB. Importar primero `OpenBench.views`, como hace la
    aplicación, dio 0 errores; el script creador repitió todas las
    precondiciones dentro de la transacción.
+4. La primera sonda del build limpio abrió Bash como login shell en
+   `/home/djime` y no encontró el toolchain (exit **1**); dos intentos de pasar
+   la ruta con espacios mediante quoting anidado produjeron `cd: too many
+   arguments`: uno expiró con exit **124** y otro devolvió un exit 0 engañoso
+   porque una orden posterior sí pasó. Ninguno invocó el compilador. Se
+   rechazaron los tres y un script Bash literal, con cwd y TMP/TEMP explícitos,
+   produjo el build medido arriba.
 
 **Decisión provisional**: #353 está en cola oficial con identidad correcta y
 sin cambiar prioridades. La campaña de 10 M sigue **BLOQUEADA**. Faltan el
