@@ -796,11 +796,20 @@ campaña de 10 M.
    `git show` demostró que es exactamente el **tree SHA** de `fde58c68…`;
    OpenBench entrega ese árbol y pasa el commit por `GIT_SHA_FULL`, por lo que
    no hay deriva.
+6. Al terminar de forma natural Horde #348, el selector eligió Spell #351:
+   su prioridad era **303**, superior a 100 del canary. No se detuvo ni
+   preemptó el trabajo ajeno. #352 se elevó operativamente a prioridad
+   **1.000** antes de ningún resultado científico; comando, activos, semilla y
+   gates no cambiaron. #351 quedó ejecutando 1.536 partidas con concurrencia
+   12 y TC efectivo 65,07+0,65; #352 conservó `PENDING`, intentos 0.
 
-**Decisión provisional**: #352 queda en cola oficial; el único worker continúa
-un lote Horde LTC no interrumpible. La campaña de 10 M permanece **BLOQUEADA**
-hasta descargar el chunk, verificar recibo/manifiesto, `audit_terabin --strict`,
-round-trip y `check_label_units --net`.
+**Decisión provisional**: #352 queda en cola oficial tras #351, con prioridad
+1.000 y sin preemptar el lease vigente. La campaña de 10 M permanece
+**BLOQUEADA** hasta descargar el chunk, verificar recibo/manifiesto,
+`audit_terabin --strict`, round-trip byte a byte y
+`check_label_units --net`. La equivalencia motor↔Python con sidecar ya pasó en
+el preflight; OpenBench v41 publica el blob único y no conserva sidecars del
+worker.
 
 **Learnings provisionales**: (1) medir todo activo antes de anunciar bytes;
 (2) el hash corto de OpenBench solo localiza el objeto, el contrato v41 debe
