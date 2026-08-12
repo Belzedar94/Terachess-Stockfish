@@ -805,12 +805,15 @@ campaña de 10 M.
    máximo. Antes de ningún resultado, una transacción fail-closed exigió
    prioridad 301, `PENDING`, intentos 0 y máquina nula; cambió solo a **304** y
    creó `LogEvent` **2326**, `Admin`, `MODIFY priority 301->304 (canary queue)`.
-   #351 quedó intacto ejecutando 1.536 partidas con concurrencia 12 y TC
-   efectivo 65,07+0,65; #352 conservó `PENDING`, intentos 0.
+   Tras la indicación del propietario, el evento autenticado **2327** de
+   `belzedar` dejó #352 en **302**, por debajo de #351 (**303**) y por encima
+   de la cola ordinaria (**301**). No se harán más cambios de prioridad. #351
+   quedó intacto ejecutando 1.536 partidas con concurrencia 12 y TC efectivo
+   65,07+0,65; #352 conservó `PENDING`, intentos 0.
 
 **Decisión provisional**: #352 queda en cola oficial tras #351, con prioridad
-304 —un punto sobre el máximo activo observado, 303— y sin preemptar el lease
-vigente. La campaña de 10 M permanece
+302, por debajo de #351 y sin preemptar el lease vigente. La campaña de 10 M
+permanece
 **BLOQUEADA** hasta descargar el chunk, verificar recibo/manifiesto,
 `audit_terabin --strict`, round-trip byte a byte y
 `check_label_units --net`. La equivalencia motor↔Python con sidecar ya pasó en
