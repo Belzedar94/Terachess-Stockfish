@@ -733,3 +733,78 @@ en memoria; el digest pertenece al stream del loader; (2) el resume idempotente
 también es una frontera de autenticación, no un atajo anterior a los hashes;
 (3) añadir procedencia a sidecars no versiona `tera-bin`, pero cambiar cualquier
 byte de header/registro sí exigiría `tera-bin v2`.
+
+---
+
+## 2026-08-12 — Alta en OpenBench oficial y canary net-2: **EN CURSO**
+
+**Hipótesis**: el primer workload distribuido solo es admisible si producción
+expone previamente el motor y la red, la creación v41 congela las identidades
+completas y el chunk permanece en `PENDING` hasta ser visible y revisado. El
+canary debe pasar auditoría `tera-bin v1` y unidades con NNUE antes de crear la
+campaña de 10 M.
+
+**Cambios**:
+
+- `fde58c6823b1d97e77a70b9827433aab55a8b143` añadió autenticación fail-closed
+  de productor/red/libro; build limpio desde `git archive`: 4.326.374 B,
+  SHA-256 `6a6f31f992ef2b46bc48b664d4b46adf7981e693c5bb2166fe7fdcb504e88ec0`,
+  `source_dirty=false`, contrato positivo y 5/5 negativos PASS, bench
+  **32.541 ×4** (NPS 131.744, 127.113, 130.164, 132.280).
+- `d38dc5de24196851c10a6857829330623e723ffb` congeló los presets v41: canary
+  20.000 y campaña 10.000.000, ambos a 8.000 nodos, startpos, net-2 y el commit
+  productor anterior. El alta central quedó canonizada en OpenBench
+  `ee320a30` (`Bench: 32541`).
+- Producción tenía antes del alta **67** entradas sucias: 5 ficheros
+  versionados con 774 inserciones/6 borrados de trabajo AtomicDB y artefactos
+  no versionados. El deploy canónico, que ejecuta `reset --hard`, se dejó
+  fallar cerrado. Se aplicó solo el delta recuperable documentado: dos ficheros
+  con hashes verificados, backup
+  `Config/config.json.bak-terachess-20260812-ee320a30`, `manage.py check` 0,
+  `makemigrations --check --dry-run` 0, reinicio únicamente de `openbench`,
+  servicio activo y HTTP local/público 200. El worker conservó PID **27540** y
+  **T24**.
+- net-2 se registró como `tera-net2.tnn`, ID OpenBench `05162B61`, default,
+  **56.858.966 B**, SHA-256 completo
+  `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`.
+- Canary oficial **#352**: 20.000 posiciones en 1 chunk, seed
+  202608120000000, prioridad 100, protocolo 41, campaña
+  `terachess-net2-regime-20260812`, rol `canary`, cohort
+  `net2-n8000-startpos-v1`. El contrato publicado congeló red/bytes exactos,
+  commit `fde58c68…`, bench 32.541, productor requerido y hashes de contrato:
+  publicación `0fcda0aedb5f873d0250ae6f371cf469aa6793d97a591243ff503f63551fcec2`,
+  productor `2e92f4afcb63dc5da336a40f354697d3cbf35a569620ef3c61571033116aa853`
+  y entorno `310d337236145781f7ebf75437014f9eda5e359dcc99a8323d8f607f316e3e36`.
+
+**Incidentes y diagnóstico**:
+
+1. Se anunció sin medir un tamaño de red de 318.572 B; era falso. La medición
+   previa a toda transmisión dio **56.858.966 B** y el hash contractual exacto.
+   La cifra se corrigió antes del alta.
+2. Chrome bloqueó `setFiles` antes de transmitir por no tener acceso a URLs de
+   fichero. Se usó staging SSH + hash/tamaño + alta transaccional en el mismo
+   modelo `Network`; la UI autenticada marcó después el objeto exacto como
+   default.
+3. Una sonda anónima al endpoint de descarga guardó **64 B** de JSON de error,
+   no la red. Se rechazó por tamaño/hash; la comprobación válida es el objeto
+   de producción `Media/05162B61`, medido directamente.
+4. La creación por un usuario approver dejó #352 con `approved=true`
+   automáticamente aunque la vista aún mostraba “Approve”. No se pulsó una
+   segunda aprobación. La fila fue visible y su contrato se auditó con estado
+   `PENDING`, 0/1 chunks, antes de que el worker quedara libre.
+5. El ZIP fuente v41 nombra `fdd71548…`, distinto del commit a primera vista.
+   `git show` demostró que es exactamente el **tree SHA** de `fde58c68…`;
+   OpenBench entrega ese árbol y pasa el commit por `GIT_SHA_FULL`, por lo que
+   no hay deriva.
+
+**Decisión provisional**: #352 queda en cola oficial; el único worker continúa
+un lote Horde LTC no interrumpible. La campaña de 10 M permanece **BLOQUEADA**
+hasta descargar el chunk, verificar recibo/manifiesto, `audit_terabin --strict`,
+round-trip y `check_label_units --net`.
+
+**Learnings provisionales**: (1) medir todo activo antes de anunciar bytes;
+(2) el hash corto de OpenBench solo localiza el objeto, el contrato v41 debe
+congelar además SHA-256 completo y tamaño; (3) una cuenta approver puede saltar
+el estado visual “sin aprobar”, así que la verdad operativa se consulta en DB;
+(4) un árbol remoto sucio no autoriza a destruir trabajo ajeno para desplegar
+un JSON independiente.
