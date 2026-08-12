@@ -830,3 +830,55 @@ el estado visual “sin aprobar”, así que la verdad operativa se consulta en 
 (4) un árbol remoto sucio no autoriza a destruir trabajo ajeno para desplegar
 un JSON independiente; (5) toda mutación operativa de prioridad necesita
 readback independiente de DB y evento explícito, igual que una sonda científica.
+
+### 2026-08-12 — Autopsia del intento 1: build Linux AVX-512 **FAIL CERRADO**
+
+**Hipótesis**: el canary #352 debe construir el mismo commit público en toda
+máquina admitida por OpenBench; un fallo anterior a DATAGEN debe reencolar el
+chunk sin datos y bloquear el workload hasta causa raíz.
+
+**Evidencia y cambios**:
+
+- Spell #351 terminó primero en el worker T24 por bound alto: **1.078**
+  partidas, **+687 −348 =43**, LLR **2,94924** sobre **2,94444**. Otro worker
+  Linux, máquina OpenBench **16** (`UnholyCrusade`), no compatible con ese
+  workload Spell, pudo seleccionar #352 mientras #351 cerraba: la prioridad se
+  aplica después de filtrar compatibilidad por máquina, no como barrera global.
+  El intento no produjo datos.
+- `event2328.log`: **33.028 B**, SHA-256
+  `bf0014bde52efeff121383ce2c1638534d60696abe944557939d8a7b4a6d8f1c`.
+  GCC 16 seleccionó `x86-64-avx512icl`; `movepick.cpp` falló desde la primera
+  declaración `__m512i` y todos los intrínsecos `_mm512_*` por faltar su header.
+  DB tras el fallo: chunk `PENDING`, intentos **1**, máquina nula, 0/20.000
+  posiciones. #352 se detuvo mediante CAS sobre ese estado exacto y el mismo
+  error; evento **2330**, 0 registros, prioridad sin modificar (**302**).
+- Cambio mínimo: `movepick.cpp` incluye `<immintrin.h>` solamente cuando
+  `USE_AVX512` está definido. No cambia reglas, búsqueda, formato ni red.
+
+**Validación previa al nuevo workload**:
+
+- La primera réplica MinGW fue inválida: PATH incompleto, compilador ausente,
+  exit **127**; se rechazó. Con PATH correcto, el árbol prepatch compiló
+  `movepick.cpp` en MinGW, demostrando que Windows ocultaba la deuda mediante
+  includes transitivos; la orquestación expiró durante el build y no se contó
+  como PASS Linux.
+- Árbol limpio `fde58c6` + parche, GCC **16.1.0**, sin PGO, `-j2`, target
+  `x86-64-avx512icl`: build/enlace exit **0**, 0 líneas de error, binario
+  **4.341.467 B**. Ejecutarlo en el Ryzen 9 5950X terminó 4/4 con
+  `0xC000001D` antes de buscar: sonda rechazada, porque el detector clasifica
+  esta CPU como `x86-64-bmi2` y no soporta ICL.
+- Mismo árbol parcheado, target soportado `x86-64-bmi2`, net-2 exacta: build
+  exit **0**, 0 líneas de error, binario **4.326.374 B**, SHA-256
+  `118ee1f3de9a2a71454e5d8f259eec104ff27228d6438c6ddde723aaa4702a47`.
+  Carga 4/4 del SHA-256 completo de net-2 y bench **32.541 ×4**; NPS **110.683,
+  43.272, 60.710, 69.236** bajo el worker T24 y otro build concurrentes.
+
+**Decisión**: #352 queda cerrado y no se reutiliza: su contrato v41 fija el
+commit fallido. Se publica el fix con bench firmado y se crea un canary nuevo,
+con identidad/commit nuevos y exactamente los mismos parámetros/gates. La
+validación decisiva del include será el build Linux de OpenBench; la campaña de
+10 M sigue bloqueada.
+
+**Learning**: un build `native` validado solo en Windows no cubre headers SIMD
+en GNU/Linux. Toda arquitectura que OpenBench pueda seleccionar necesita al
+menos un build real en ese sistema antes del primer workload científico.

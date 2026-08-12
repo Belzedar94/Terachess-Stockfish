@@ -23,6 +23,10 @@
 #include <limits>
 #include <utility>
 
+#ifdef USE_AVX512
+    #include <immintrin.h>
+#endif
+
 #include "bitboard.h"
 #include "misc.h"
 #include "position.h"
