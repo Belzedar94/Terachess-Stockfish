@@ -883,7 +883,7 @@ validación decisiva del include será el build Linux de OpenBench; la campaña 
 en GNU/Linux. Toda arquitectura que OpenBench pueda seleccionar necesita al
 menos un build real en ese sistema antes del primer workload científico.
 
-### 2026-08-12 — Deploy r2 y canary oficial #353: **EN CURSO**
+### 2026-08-12 — Deploy r2 y canary oficial #353: **PASS datos / PENDIENTE Linux**
 
 **Hipótesis**: el reemplazo de #352 debe ser un workload nuevo cuyo contrato
 v41 fije el commit con el arreglo AVX-512. Debe conservar prioridad **302**,
@@ -951,6 +951,26 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
   **16** registros y la sonda nueva dio **16/16** sobre los mismos 2.336 B.
   El control negativo `--expected-records 17` falló cerrado con exit **2** al
   leer el header real de 16.
+- El intento **2** de #353 fue reclamado naturalmente por el worker T24 tras
+  los workloads Spell; OpenBench volvió a construir el productor, reprodujo
+  bench **32.541** y completó 20.000/20.000 entre **13:57:08** y
+  **13:57:24 UTC**. Recibo v41 self-hash
+  `4cffa7fe2caffa77cbd0efe85965047c1dd49def6a69fe205a26b6b9a63083dd`:
+  máquina 12, intento 2, contrato de publicación `96f6e0a7…`, productor exacto
+  `40315359…` de 4.326.374 B y artefacto `.bz2` de **660.219 B**, SHA-256
+  `2cd8edc5d188b771036d7b9e532341acef7d8cbf85f449f13ccc97207ea8bdf3`.
+  Servidor, DB y descarga independiente reprodujeron el mismo hash/tamaño.
+- Descompresión: **2.880.032 B** exactos (`32 + 20.000 × 144`), SHA-256
+  `db0a11687bd544e379cd093f3dcb73997db3b2c539555a5c8f1496667cb462b3`.
+  `audit_terabin.py --strict`: header 20.000/20.000, source_count **33.387**,
+  flags 0, 0 registros inválidos y **0 warnings**. W/D/L **8.458 / 3.023 /
+  8.519**; fases opening/middle/late/endgame **41,225 % / 29,550 % /
+  23,130 % / 6,095 %**; piezas min/media/max **6 / 84,11 / 128**.
+  `check_terabin_roundtrip.py --expected-records 20000`:
+  **20.000/20.000** byte-exactos.
+- Gate de unidades sobre el blob descargado y el productor oficial: muestra
+  exacta **300/300**, NNUE **300/300**, pendiente label/eval **1,017** dentro
+  de [0,8; 1,25], correlación **0,994** ≥ 0,9, **PASS**.
 
 **Incidentes y diagnóstico**:
 
@@ -999,15 +1019,28 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
    el motivo; evento `REQUEUE chunk 0 after local exit (attempt 1)`. Readback:
    prioridad **302**, 0 registros, 0 bytes y máquina nula. No se interrumpió el
    Spell que el scheduler había concedido durante esa ventana.
+7. Una sonda HTTP anónima a `/api/datagen/353/` devolvió el JSON esperado de
+   política, `API requires authentication for this server`; no es prueba del
+   manifiesto y se rechazó. Además, el wrapper intentó usar un método
+   `SHA256.HashData` inexistente en este PowerShell y lanzó excepción después
+   de recibir la respuesta. No se extrajeron ni reutilizaron credenciales: la
+   evidencia aceptada es el recibo v41 recomputado en servidor y los bytes
+   descargados/rehasheados por SSH.
 
-**Decisión provisional**: #353 está en cola oficial con identidad correcta y
-sin cambiar prioridades. La campaña de 10 M sigue **BLOQUEADA**. Faltan el
-build Linux real, el chunk completo, el recibo/artefacto autenticados, auditoría
-estructural sin warnings, round-trip **20.000/20.000** y gate de unidades
-NNUE **300/300** con los bounds congelados.
+**Decisión**: los gates de datos del canary #353 son **PASS** sin relajaciones.
+La campaña de 10 M sigue **BLOQUEADA** por un único gate declarado antes del
+resultado: el build Linux real de OpenBench para `711177d…`. #353 fue producido
+en Windows/BMI2 y, por tanto, no demuestra que el include AVX-512 corrige el
+fallo observado por la máquina Linux 16. Esa máquina no se actualiza desde
+**12:51:07 UTC**; readback a las 14:02:05 UTC: Linux, T32, flags AVX512F/BW/DQ/
+VNNI, Terachess soportado y **4.257,5 s** sin heartbeat. No se crea el workload
+de 10 M ni se sustituye este gate por una compilación local/manual; todos los
+tests deben permanecer en OpenBench.
 
 **Learnings provisionales**: (1) los health-checks deben usar la ruta canónica
 antes de interpretar un redirect como caída; (2) un script operativo remoto
 debe ser literal cuando contiene sintaxis que también entiende PowerShell;
 (3) la validación seca debe reproducir el orden de imports de la aplicación y
-probar explícitamente que no creó filas.
+probar explícitamente que no creó filas; (4) un canary de datos puede quedar
+verde sin cubrir la plataforma que motivó su relanzamiento: ambas evidencias
+son gates distintos y no se sustituyen entre sí.
