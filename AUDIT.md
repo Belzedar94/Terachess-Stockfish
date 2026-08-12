@@ -557,3 +557,103 @@ build/bench, no un sustituto de OpenBench.
 ningún enlace LTO; (2) bajo flota T24 la firma de nodos sigue siendo válida pero
 el NPS local no permite atribuir una regresión; (3) registrar también errores de
 invocación evita convertir una sonda rota en un diagnóstico del motor.
+
+---
+
+## 2026-08-12 — Bootstrap de build OpenBench con net-2: **PASS local**
+
+**Hipótesis**: el contrato público de OpenBench —`make -j EXE=...`
+`GIT_SHA_FULL=... EVALFILE=...`, seguido de `bench` sin argumentos— debe
+producir un binario nativo que cargue net-2 desde `Engines/../Networks/`, use
+esa misma red en el datagen embebido y falle cerrado si el archivo no existe.
+No se habilita ningún piloto distribuido mientras una de esas propiedades sea
+implícita o dependa de un `setoption` que el DATAGEN de OpenBench no envía.
+
+**Cambios**:
+
+- `src/Makefile` acepta la identidad completa del commit y hornea solamente
+  `../Networks/<basename>` como `EvalFile` por defecto; el path absoluto del
+  worker no entra en el ejecutable. El `make` desnudo despacha el build nativo
+  sin PGO y se añadió el detector portable `scripts/get_native_properties.sh`
+  que ya usa el checkout operativo de Spell/OpenBench.
+- `Engine` carga el default compilado una sola vez al arrancar y termina con
+  código distinto de cero si no puede activarlo. Los engines del datagen
+  comparten la red global inmutable ya cargada en vez de releerla por hilo.
+- `bench` sin argumentos equivale al contrato firmado `bench 16 1 5`; los
+  argumentos explícitos no cambian.
+
+**Validación local previa a OpenBench**:
+
+- Build exacto del worker, sin target/`ARCH`/`COMP`, bajo MSYS2 GCC **16.1.0**:
+  `make -j2 EXE=terachess-ob-bare.exe GIT_SHA_FULL=2b255e050b4356d3e183a9a8b4f8f4b4a41094ab EVALFILE=<Networks/05162b61>`.
+  Exit **0**; detector: `ARCH=native` → **x86-64-bmi2**. SHA-256 del primer
+  binario validado: `c8310d2e22f88d925e671b9a91428802f3bc627bc069370dd5169e190421c1bb`;
+  tras integrar el sharing de red y el parser Windows, SHA-256 final
+  `e52716bcbd1f2c8c2348a38f8b3018fee1aa02990d9da7d143d481ceb1bb1bc7`.
+- En una réplica `Engines/../Networks/`, el arranque confirmó `EvalFile:
+  loaded '../Networks/05162b61'`, `arch_hash`
+  `92935a4de67fb1804e3fab2e529157e7bd6732b00bae867e74c9e6a824f0dd26`.
+  `bench` con net-2: **32.541 nodos en 4/4**; NPS **94.595, 133.364,
+  104.633 y 121.876** bajo el worker T24 concurrente. La sonda material previa
+  conservó **21.519 en 4/4**. El NPS no se usa como comparación de rendimiento
+  por la carga compartida; las firmas de nodos sí son deterministas.
+- Recinto negativo creado desde cero, con ausencia de
+  `Networks/05162b61` verificada antes de ejecutar: mensaje `CRITICAL ERROR`,
+  red `REJECTED`, proceso **exit 1**. No hubo fallback silencioso a material.
+- Sobre el binario público con net-2:
+  `python oracle/run_fixtures.py --impl both` → **87 fixtures, 0 fallos**;
+  `python oracle/engine_check.py --engine <binario>` → **87 listas exactas +
+  31 perft, 0 fallos**, startpos **54 / 2.916 / 175.508**.
+- `parity_gate.py --min-positions 300` sobre el binario final y net-2 →
+  **300 posiciones, buckets 0–7, 0 cp, 0 discrepancias, PASS**.
+  `check_label_units.py --net tera-net2.tnn` sobre 150 muestras de `c3_final`
+  confirmó **NNUE 150/150**, pendiente **1,044**, correlación **0,991**, PASS.
+  La sonda negativa `--net none` detectó NNUE **0/20** y falló cerrado con
+  exit **2**. El gate ahora acepta `--net`, comprueba el return code del motor
+  y rechaza explícitamente cualquier fallback material cuando se exige NNUE.
+- Smoke del comando de una línea con ruta absoluta Windows de **145 caracteres**,
+  net-2 y dos workers: **16/16 registros**, exit **0**, un solo mensaje de
+  carga de red, **6,88 pos/s**. SHA-256 del `tera-bin`:
+  `19d9a4b566b29d3f1d8a6e20fbbf4f10148b6cfadfe76686541868342e4d58c7`.
+  `audit_terabin.py --strict` → **16 registros, 0 warnings**;
+  doble round-trip → **8/8 exactos**.
+
+**Incidentes y diagnóstico**:
+
+1. El primer uso de `$(notdir $(EVALFILE))` partió una ruta Windows con
+   espacios y horneó un basename falso; una compilación fallida lo detectó.
+   Se sustituyó por `basename -- "$(EVALFILE)"` y se inspeccionó la macro real
+   del compilador antes de ejecutar el binario.
+2. Una primera macro llevaba barras de escape de más y no compiló; corregir a
+   una única cita escapada produjo el literal esperado. Un intento posterior
+   desde PowerShell encontró `make` fuera de `PATH` (exit **1**, sin compilar);
+   repetir mediante el bash MSYS2 prescrito reprodujo el entorno del worker.
+3. La primera sonda de red ausente era inválida: el recinto reutilizado aún
+   contenía la red y devolvió exit **0**. El resultado se rechazó y la sonda
+   limpia, con precondición `Test-Path=False`, devolvió exit **1**. Es la misma
+   clase de error de arnés que obliga a desconfiar de resultados demasiado
+   limpios.
+4. El primer smoke envió BOM desde `StandardInput` de PowerShell: el motor vio
+   `﻿datagen`, lo rechazó y luego salió 0 al procesar `quit`; exigir además los
+   tres artefactos evitó el falso positivo. Python envió UTF-8 sin BOM. Esa
+   repetición destapó un bug real: `std::quoted` consumía las barras inversas
+   de paths Windows entre comillas, colapsando el path absoluto en un nombre y
+   produciendo `Filename too long` con solo 145 caracteres. Un parser literal
+   de delimitador preserva `\`; la misma ruta pasó después y protege también
+   `{BOOK}`.
+5. Se pidió revisión asesora a Oracle mediante la sesión ChatGPT Pro: el modelo
+   `gpt-5-pro` quedó verificado, pero Chrome dejó de ser alcanzable tras 20 min
+   sin respuesta; el segundo intento recibió `ECONNREFUSED`. No hubo respuesta
+   asesora ni fallback a API, por lo que ninguna decisión se atribuye a Oracle.
+
+**Decisión**: bootstrap de build **PASS local**. Esto es un preflight
+determinista, no un test científico: el piloto de generación sigue bloqueado
+hasta congelar dentro del comando la identidad SHA-256 de productor, red y
+libro, validar unidades con la red y publicar/aprobar el workload en el
+OpenBench oficial `https://belzedar.duckdns.org`.
+
+**Learnings**: (1) el `EVALFILE` de OpenBench es un input de build y no una
+orden UCI para DATAGEN; debe convertirse explícitamente en default verificable;
+(2) un singleton de red permite compartir pesos, pero solo después de una
+carga temprana que falle cerrado; (3) una sonda negativa necesita demostrar
+su precondición —no basta con que el nombre del directorio diga “missing”.

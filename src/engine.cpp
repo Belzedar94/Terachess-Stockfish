@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <deque>
 #include <iosfwd>
@@ -48,13 +49,19 @@ namespace Stockfish {
 constexpr int MaxHashMB  = Is64Bit ? 33554432 : 2048;
 int           MaxThreads = std::max(1024, 4 * int(get_hardware_concurrency()));
 
+#ifdef TERA_EVALFILE_DEFAULT
+constexpr const char* DefaultEvalFile = TERA_EVALFILE_DEFAULT;
+#else
+constexpr const char* DefaultEvalFile = "";
+#endif
+
 // The default configuration will attempt to group L3 domains up to 32 threads.
 // This size was found to be a good balance between the Elo gain of increased
 // history sharing and the speed loss from more cross-cache accesses (see
 // PR#6526). The user can always explicitly override this behavior.
 constexpr NumaAutoPolicy DefaultNumaPolicy = BundledL3Policy{32};
 
-Engine::Engine(std::optional<std::filesystem::path> path) :
+Engine::Engine(std::optional<std::filesystem::path> path, bool loadDefaultEval) :
     binaryDirectory(path ? CommandLine::get_binary_directory(*path) : std::filesystem::path{}),
     numaContext(NumaConfig::from_system(DefaultNumaPolicy)),
     states(new std::deque<StateInfo>(1)),
@@ -115,9 +122,10 @@ Engine::Engine(std::optional<std::filesystem::path> path) :
     options.add("UCI_ShowWDL", Option(false));
 
     // NNUE "S" (docs/nnue-tera-s.md). EvalFile is a path to a .tnn/.tnn1
-    // network; an empty value (the default) keeps the material evaluation.
+    // network. OpenBench EVALFILE builds use a deterministic path relative to
+    // the final executable; ordinary builds keep the material fallback.
     options.add(  //
-      "EvalFile", Option("", [this](const Option& o) { return set_eval_file(o); }));
+      "EvalFile", Option(DefaultEvalFile, [this](const Option& o) { return set_eval_file(o); }));
 
     options.add(  //
       "UseNNUE", Option(true, [](const Option& o) {
@@ -127,6 +135,19 @@ Engine::Engine(std::optional<std::filesystem::path> path) :
 
     threads.clear();
     resize_threads();
+
+    if (loadDefaultEval && DefaultEvalFile[0])
+    {
+        TeraNNUE::set_use_nnue(true);
+        const auto status = set_eval_file(DefaultEvalFile);
+        if (!TeraNNUE::active())
+        {
+            sync_cout << "info string CRITICAL ERROR: "
+                      << status.value_or("default EvalFile did not load") << sync_endl;
+            std::exit(EXIT_FAILURE);
+        }
+        sync_cout << "info string " << status.value_or("EvalFile: loaded") << sync_endl;
+    }
 }
 
 std::variant<u64, PositionSetError> Engine::perft(const std::string& fen, Depth depth) {

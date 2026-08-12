@@ -913,12 +913,27 @@ endif
 BUILD_SHA_FILE       := .build_sha.txt
 BUILD_DATE_FILE      := .build_date.txt
 BUILD_DIFFINDEX_FILE := .build_diffindex.txt
-GIT_SHA              := $(shell git rev-parse HEAD 2>/dev/null | cut -c 1-8 || true)
+GIT_SHA_FULL         ?= $(shell git rev-parse HEAD 2>/dev/null || true)
+GIT_SHA              := $(shell printf '%s' "$(GIT_SHA_FULL)" | cut -c 1-8)
 GIT_DATE             := $(shell git show -s --date=format:%Y%m%d --format=%cd HEAD 2>/dev/null || true)
 GIT_DIFFINDEX        := $(shell git diff-index --quiet HEAD -- 2>/dev/null; [ $$? -eq 1 ] && echo 1 || true)
 COMPILER_DATE        := $(shell date +%Y%m%d 2>/dev/null)
 
 BUILD_DATE           := $(if $(GIT_DATE),$(GIT_DATE),$(COMPILER_DATE))
+
+# OpenBench builds public sources from a GitHub archive, so there is no .git
+# directory at compile time. The worker supplies GIT_SHA_FULL and EVALFILE on
+# the make command line. Keep only a deterministic path relative to the final
+# executable (Engines/ or the per-chunk Datagen/ snapshot); never compile an
+# absolute worker path into the binary.
+ifneq ($(strip $(GIT_SHA_FULL)),)
+	CPPFLAGS += -DGIT_SHA_FULL=$(GIT_SHA_FULL)
+endif
+CPPFLAGS += -DTERA_SOURCE_DIRTY=$(if $(GIT_DIFFINDEX),1,0)
+ifneq ($(strip $(EVALFILE)),)
+	TERA_EVALFILE_BASENAME := $(shell basename -- "$(EVALFILE)")
+	CPPFLAGS += -DTERA_EVALFILE_DEFAULT=\"../Networks/$(TERA_EVALFILE_BASENAME)\"
+endif
 
 define cache_file_contents
 $(shell \

@@ -75,7 +75,7 @@ namespace Stockfish::Benchmark {
 // where to look for positions in FEN format, and the type of the limit:
 // depth, perft, nodes and movetime (in milliseconds). Examples:
 //
-// bench                            : search default positions up to depth 13
+// bench                            : search default positions up to depth 5
 // bench 64 1 15                    : search default positions up to depth 15 (TT = 64MB)
 // bench 64 1 100000 default nodes  : search default positions for 100K nodes each
 // bench 64 4 5000 current movetime : search current position with 4 threads for 5 sec
@@ -88,7 +88,9 @@ std::vector<std::string> setup_bench(const std::string& currentFen, std::istream
     // Assign default values to missing arguments
     std::string ttSize    = (is >> token) ? token : "16";
     std::string threads   = (is >> token) ? token : "1";
-    std::string limit     = (is >> token) ? token : "13";
+    // OpenBench invokes `bench` without arguments. Keep that public build
+    // identity equal to the project's signed `bench 16 1 5` contract.
+    std::string limit     = (is >> token) ? token : "5";
     std::string fenFile   = (is >> token) ? token : "default";
     std::string limitType = (is >> token) ? token : "depth";
 

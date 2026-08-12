@@ -18,6 +18,7 @@ profile-build está prohibido en esta máquina hasta que se demuestre lo contrar
 | 2026-07-19 | 242a3d5 | `bench 16 1 5` | **21.519** | 331.061 | Corrección del bug de LMR (`min(moveCount,40)`). Árbol distinto, como debe ser |
 | 2026-07-19 | 1341b14 | `bench 16 1 5` | **21.519** | 413.826 | ADR-001 (`to_cp` identidad). Firma **idéntica**: confirma que el cambio es solo de unidades y no toca el árbol |
 | 2026-07-19 | 3ce4612 | `bench 16 1 5` sin red | **21.519** | — | net-1 disponible; sin red la firma no cambia (la integración NNUE no altera el árbol material) |
+| 2026-08-12 | bootstrap OpenBench (base `2b255e0`) | `bench` ×4, build público con net-2 | **32.541** | 94.595–139.660 | GCC 16.1, `ARCH=native`→`x86-64-bmi2`, worker T24 concurrente; material `bench` ×4 conservó **21.519** |
 
 ## Otras mediciones de referencia (mismo commit 94fab4f)
 

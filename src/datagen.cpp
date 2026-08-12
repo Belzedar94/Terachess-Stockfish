@@ -750,8 +750,21 @@ bool load_book(const std::filesystem::path& path,
 
 bool read_path(std::istream& args, std::filesystem::path& value, bool allowNone) {
     std::string text;
-    if (!(args >> std::quoted(text)))
+    args >> std::ws;
+    if (args.peek() == '"')
+    {
+        args.get();
+        if (!std::getline(args, text, '"'))
+            return false;
+    }
+    else if (!(args >> text))
         return false;
+
+    // std::quoted treats every backslash as an escape. That silently turns a
+    // quoted Windows path such as C:\Users\... into C:Users... and can collapse
+    // the whole path into one overlong filename. A double quote is not legal
+    // inside a Windows filename, so the literal-delimiter parser above is both
+    // lossless for worker paths and intentionally simple.
     if (allowNone && (text == "NONE" || text == "none"))
     {
         value.clear();
@@ -1744,7 +1757,11 @@ bool run(std::istream&                               args,
                 error = "new shard path already exists: " + shardPath.string();
                 return false;
             }
-            engines[id] = std::make_unique<Engine>(binaryPath);
+            // The UCI owner loaded and authenticated the compiled default once
+            // before dispatching this command. TeraNNUE is process-global, so
+            // workers share that immutable network instead of re-reading it
+            // once per thread.
+            engines[id] = std::make_unique<Engine>(binaryPath, false);
             configure_engine(*engines[id], params.randomMultiPv);
         }
     }
