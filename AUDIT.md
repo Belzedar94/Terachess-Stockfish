@@ -498,3 +498,62 @@ separado, y ahora existe; (3) importar un modelo estadístico ajustado a ajedrez
 (WDL) a una variante con 128 piezas y 26 tipos es exactamente la clase de
 supuesto que el playbook manda auditar: estaba en la lista de "constantes
 chess-tuned" y aun así se coló por venir en una ruta de "solo presentación".
+
+---
+
+## 2026-08-12 — Traspaso verificado: **PASS** (commit `ebaba5e`)
+
+**Hipótesis**: el árbol publicado conserva en esta máquina la identidad de
+búsqueda, reglas, inferencia de net-2 y unidades de los datos declaradas en
+`TRANSFER.md` §8. Ningún trabajo del backlog se habilita si uno de esos gates
+falla.
+
+**Cambios**: ninguno en código, contratos, datos o red. Se recompiló el motor
+material-only desde limpio; la única edición durable de esta iteración es esta
+entrada del ledger. El worker oficial de OpenBench se observó conectado a
+`https://belzedar.duckdns.org` con PID 27540 y `-T 24`; no se detuvo ni se
+modificó.
+
+**Validación** (todos los comandos terminaron con exit 0):
+
+- Build limpio, sin PGO, MSYS2 mingw64 GCC **16.1.0**, Python **3.12.0**:
+  `make -j2 build ARCH=x86-64-bmi2 COMP=mingw TMP='C:\Users\djime\AppData\Local\Temp' TEMP='C:\Users\djime\AppData\Local\Temp'`.
+  Se usaron 2 jobs, no `-j` ilimitado, para no competir con el worker T24.
+- `bench 16 1 5`: **21.519 nodos en 4/4 corridas**. NPS observados:
+  165.530, 193.864, 199.250 y 192.133; inferiores a los 331–414 kn/s de
+  `BENCH_LOG.md`, pero no comparables como perf por la carga concurrente de la
+  flota. La identidad falsable del árbol sí coincide exactamente.
+- `python oracle/run_fixtures.py --impl both`: **87 fixtures**, implementaciones
+  A y B, **0 fallos**.
+- `python oracle/engine_check.py --engine ../src/stockfish.exe`: **87 listas
+  exactas + 31 comprobaciones perft, 0 fallos**; startpos
+  **54 / 2.916 / 175.508**.
+- `python tools/parity_gate.py --engine ../src/stockfish.exe --net
+  ../nets/tera-net2.tnn --ref ../data/pref_n2.jsonl`: **300 posiciones**, los
+  buckets 0–7 presentes, **0 discrepancias, PASS (0 cp)**. SHA-256 de net-2:
+  `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`.
+- `python tools/check_label_units.py --engine ../src/stockfish.exe --data
+  ../data/c3_final.bin --positions 150`: **150 posiciones**, pendiente
+  label/eval **1,016**, correlación **0,989**, **PASS**.
+
+**Incidentes y diagnóstico**:
+
+1. La primera invocación perdió las barras inversas de `TMP/TEMP` por quoting y
+   GCC intentó crear `src\C:UsersdjimeAppDataLocalTemp\`: fallo de la sonda, no
+   del proyecto. Repetir con comillas simples preservó la ruta.
+2. La segunda invocación encontró objetos LTO antiguos de GCC 15.2
+   (`LTO version 15.1`) al enlazar con GCC 16.1 (`expected 16.0`). `make clean`
+   seguido de build completo eliminó la mezcla de toolchains y produjo el
+   binario válido (SHA-256
+   `142664df885bffe8e06c9112a16bfd9ec41cd24052977a15c7db9dbf1250d625`).
+
+**Decisión**: traspaso **PASS**; el backlog queda desbloqueado. Por decisión del
+propietario, toda ciencia posterior —SPRT STC/LTC, partidas fijas y DATAGEN— se
+creará, aprobará y ejecutará en el OpenBench oficial antes de arrancar; estos
+cinco gates locales son el preflight determinista exigido por sus contratos de
+build/bench, no un sustituto de OpenBench.
+
+**Learnings**: (1) una actualización de GCC exige `make clean` antes de creer
+ningún enlace LTO; (2) bajo flota T24 la firma de nodos sigue siendo válida pero
+el NPS local no permite atribuir una regresión; (3) registrar también errores de
+invocación evita convertir una sonda rota en un diagnóstico del motor.
