@@ -798,13 +798,19 @@ campaña de 10 M.
    no hay deriva.
 6. Al terminar de forma natural Horde #348, el selector eligió Spell #351:
    su prioridad era **303**, superior a 100 del canary. No se detuvo ni
-   preemptó el trabajo ajeno. #352 se elevó operativamente a prioridad
-   **1.000** antes de ningún resultado científico; comando, activos, semilla y
-   gates no cambiaron. #351 quedó ejecutando 1.536 partidas con concurrencia
-   12 y TC efectivo 65,07+0,65; #352 conservó `PENDING`, intentos 0.
+   preemptó el trabajo ajeno. Un intento autenticado de elevar #352 a 1.000 se
+   reflejó inicialmente en la UI, pero la comprobación final mostró **301** y
+   la DB confirmó cuatro eventos `MODIFY`; el resultado 1.000 se retiró. No fue
+   un clamp del scheduler: el código admite cualquier entero y selecciona el
+   máximo. Antes de ningún resultado, una transacción fail-closed exigió
+   prioridad 301, `PENDING`, intentos 0 y máquina nula; cambió solo a **304** y
+   creó `LogEvent` **2326**, `Admin`, `MODIFY priority 301->304 (canary queue)`.
+   #351 quedó intacto ejecutando 1.536 partidas con concurrencia 12 y TC
+   efectivo 65,07+0,65; #352 conservó `PENDING`, intentos 0.
 
 **Decisión provisional**: #352 queda en cola oficial tras #351, con prioridad
-1.000 y sin preemptar el lease vigente. La campaña de 10 M permanece
+304 —un punto sobre el máximo activo observado, 303— y sin preemptar el lease
+vigente. La campaña de 10 M permanece
 **BLOQUEADA** hasta descargar el chunk, verificar recibo/manifiesto,
 `audit_terabin --strict`, round-trip byte a byte y
 `check_label_units --net`. La equivalencia motor↔Python con sidecar ya pasó en
@@ -816,4 +822,5 @@ worker.
 congelar además SHA-256 completo y tamaño; (3) una cuenta approver puede saltar
 el estado visual “sin aprobar”, así que la verdad operativa se consulta en DB;
 (4) un árbol remoto sucio no autoriza a destruir trabajo ajeno para desplegar
-un JSON independiente.
+un JSON independiente; (5) toda mutación operativa de prioridad necesita
+readback independiente de DB y evento explícito, igual que una sonda científica.
