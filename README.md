@@ -53,7 +53,10 @@ python engine_check.py --engine ../src/stockfish.exe   # motor vs oráculo
 python mass_perft.py --engine ../src/stockfish.exe --positions 1000
 
 # 3. Datos
-../src/stockfish.exe <<< "datagen out data.bin count 100000 nodes 12000 threads 8 seed 1"
+NET=../nets/tera-net2.tnn
+NET_SHA=$(sha256sum "$NET" | cut -d' ' -f1)
+PRODUCER_SHA=$(sha256sum ../src/stockfish.exe | cut -d' ' -f1)
+../src/stockfish.exe <<< "datagen out data.bin count 100000 nodes 12000 threads 8 seed 1 book NONE book_sha256 NONE network $NET network_sha256 $NET_SHA producer_sha256 $PRODUCER_SHA"
 python ../tools/audit_terabin.py data.bin --strict
 
 # 4. Entrenamiento

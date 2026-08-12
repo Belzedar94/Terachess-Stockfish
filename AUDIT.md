@@ -657,3 +657,79 @@ orden UCI para DATAGEN; debe convertirse explícitamente en default verificable;
 (2) un singleton de red permite compartir pesos, pero solo después de una
 carga temprana que falle cerrado; (3) una sonda negativa necesita demostrar
 su precondición —no basta con que el nombre del directorio diga “missing”.
+
+---
+
+## 2026-08-12 — Contrato autenticado de DATAGEN/OpenBench v41: **PASS local**
+
+**Hipótesis**: un chunk publicable no puede confiar solo en que OpenBench haya
+descargado los archivos correctos. El propio productor debe rechazar, antes de
+crear directorios o shards, cualquier ausencia o deriva de productor, red o
+libro; debe demostrar que los pesos en memoria corresponden a esa red; y un
+resume debe congelar la misma identidad incluso cuando el output ya está
+completo. El formato de registros `TC01` no puede cambiar.
+
+**Cambios**:
+
+- El comando `datagen` exige `book`/`book_sha256`, `network`/
+  `network_sha256` y `producer_sha256`; acepta `NONE`/`NONE` solo para el libro
+  builtin y prohíbe red material. SHA-256 se normaliza y valida como 64 hex.
+- Se centralizó SHA-256 FIPS 180-4 en un hasher incremental. El loader TNN1
+  calcula el digest sobre el **mismo stream** que convierte en pesos y conserva
+  ese hash con la red en memoria. El arranque publica `arch_hash` y
+  `file_sha256`; DATAGEN compara ambos archivos externos y la identidad de los
+  pesos activos.
+- `GIT_SHA_FULL` produce `TERA_SOURCE_COMMIT`; el metadata final añade schema
+  `terachess-datagen-provenance-v1`, commit/dirty bit, hashes y tamaños de
+  productor/red/libro, y `network_arch_hash`. Resume sube a metadata versión
+  **2** y congela los mismos campos. Son sidecars: magic, versión, header y
+  registros de `tera-bin v1` permanecen byte-contractualmente intactos.
+- Se añadió `tools/tests/test_datagen_identity.py` como arnés positivo/negativo
+  reproducible y se actualizaron el contrato/documentación operativa.
+
+**Validación local previa a OpenBench**:
+
+- Build público sin PGO, mismo comando de worker y GCC **16.1.0**, exit **0**.
+  Binario precommit: **4.326.374 B**, SHA-256
+  `dc82b6ccf8541d420740ac17e7fb96f869ec7ecf2edadabbc2d3146137894b99`.
+  La carga reportó net-2 SHA-256 completo
+  `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`
+  y `arch_hash` `92935a4de67fb1804e3fab2e529157e7bd6732b00bae867e74c9e6a824f0dd26`.
+- Arnés de identidad: contrato ausente, SHA de productor incorrecto, SHA de
+  red incorrecto, NNUE desactivada y SHA de libro incorrecto → **5/5 exit 1,
+  cero artefactos**. Positivo → **4/4 registros**, una sola carga de red,
+  metadata exacta, `audit_terabin --strict` **0 warnings**, round-trip **4/4**.
+  Resume exacto PASS; productor distinto sobre output completo rechazado.
+- Reglas: **87 fixtures, 0 fallos**; motor vs oráculo: **87 listas exactas +
+  31 perft, 0 fallos**, startpos **54 / 2.916 / 175.508**.
+- Paridad net-2: **300 posiciones**, buckets **0–7**, **0 cp**, 0 discrepancias.
+  Unidades: **NNUE 150/150**, pendiente **1,044**, correlación **0,991**, PASS.
+- Bench net-2: **32.541 nodos en 4/4**, NPS 103.304, 123.261, 81.556 y
+  106.691 bajo T24. Tras descargar la red explícitamente, material:
+  **21.519 nodos en 4/4**, NPS 170.785, 173.540, 130.418 y 166.813. La
+  ausencia verificada de `Networks/05162b61` conservó el fail-closed: exit **1**.
+
+**Incidentes y diagnóstico**:
+
+1. La primera compilación no produjo binario (exit **2**): al centralizar el
+   hasher faltaba incluir la API pública TeraNNUE en `datagen.cpp` y quedaba
+   una referencia al helper hexadecimal retirado en un mensaje de error. La
+   corrección explícita compiló; la carga de net-2 prueba además que el hash de
+   descriptor no cambió.
+2. Una sonda material volvió a usar un pipe PowerShell con BOM: el motor
+   rechazó `﻿setoption`, dejó net-2 activa y midió 32.541; ese resultado se
+   descartó. Un intento de framing manual quedó esperando stdin y se terminó
+   sin dejar proceso hijo. Python envió bytes UTF-8 sin BOM y reprodujo
+   material 21.519 ×4. Relearning evitado: exit 0 no autentica el primer
+   comando de un stream UCI.
+
+**Decisión**: contrato del productor **PASS local**. Se puede publicar el
+commit y usarlo como pin del engine/preset. Aún **no** se autoriza la campaña:
+faltan alta/deploy en el OpenBench oficial, red net-2 registrada y un canary
+v41 aprobado cuyo chunk descargado pase auditoría y gate de unidades con NNUE.
+
+**Learnings**: (1) hashear de nuevo un path no demuestra qué bytes se cargaron
+en memoria; el digest pertenece al stream del loader; (2) el resume idempotente
+también es una frontera de autenticación, no un atajo anterior a los hashes;
+(3) añadir procedencia a sidecars no versiona `tera-bin`, pero cambiar cualquier
+byte de header/registro sí exigiría `tera-bin v2`.

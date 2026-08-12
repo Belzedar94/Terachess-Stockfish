@@ -46,13 +46,23 @@
 #include "engine.h"
 #include "misc.h"
 #include "movegen.h"
+#include "nnue/tera_network.h"
 #include "notation.h"
 #include "position.h"
 #include "score.h"
 #include "search.h"
+#include "sha256.h"
 #include "types.h"
 #include "uci.h"
 #include "ucioption.h"
+
+#ifndef TERA_SOURCE_COMMIT
+    #define TERA_SOURCE_COMMIT "0000000000000000000000000000000000000000"
+#endif
+
+#ifndef TERA_SOURCE_DIRTY
+    #define TERA_SOURCE_DIRTY 1
+#endif
 
 namespace Stockfish::Datagen {
 
@@ -72,7 +82,7 @@ constexpr int   ScoreLimit     = 32000;
 // Result codes are POV of the side to move: 0 loss, 1 draw, 2 win, 3 unknown.
 constexpr u64 ResultUnknown = 3;
 
-constexpr u64 ResumeMetaVersion = 1;
+constexpr u64 ResumeMetaVersion = 2;
 
 // A game longer than this is adjudicated as a draw (contract: hard cap).
 // Measured self-play length is ~575 plies on average with individual games
@@ -89,6 +99,7 @@ using TeraRecord = std::array<u8, TeraRecordSize>;
 struct Params {
     std::filesystem::path out;
     std::filesystem::path book;              // empty == NONE (start position)
+    std::filesystem::path network;
     u64                   count             = 0;
     u64                   nodes             = 25000;
     usize                 threads           = 1;
@@ -105,6 +116,14 @@ struct Params {
     usize                 debugSample       = 0;
     bool                  resume            = false;
     u64                   resumeNumber      = 0;
+    std::string           networkSha256;
+    std::string           producerSha256;
+    std::string           bookSha256;
+    std::string           sourceCommit = TERA_SOURCE_COMMIT;
+    bool                  sourceDirty  = TERA_SOURCE_DIRTY != 0;
+    u64                   networkSize  = 0;
+    u64                   producerSize = 0;
+    u64                   bookSize     = 0;
 };
 
 struct ResumeMetadata {
@@ -117,6 +136,13 @@ struct ResumeMetadata {
     std::string bookPath;
     u64         bookSize = 0;
     std::string bookHash;
+    std::string networkPath;
+    u64         networkSize = 0;
+    std::string networkHash;
+    u64         producerSize = 0;
+    std::string producerHash;
+    std::string sourceCommit;
+    bool        sourceDirty = true;
     u64         resumeCount = 0;
 };
 
@@ -427,42 +453,33 @@ std::filesystem::path normalized_path(const std::filesystem::path& path) {
 
 std::string portable_path(const std::filesystem::path& path) { return path.generic_string(); }
 
-bool fast_file_hash(const std::filesystem::path& path,
-                    u64&                         size,
-                    std::string&                 hash,
-                    std::string&                 error) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file)
+bool authenticate_file(const std::filesystem::path& path,
+                       const std::string&           expectedSha256,
+                       std::string_view             label,
+                       u64&                         size,
+                       std::string&                 error) {
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec) || ec)
     {
-        error = "cannot hash book " + path.string();
+        error = std::string(label) + " is not a regular file: " + path.string();
+        return false;
+    }
+    size = std::filesystem::file_size(path, ec);
+    if (ec)
+    {
+        error = "cannot read " + std::string(label) + " size: " + ec.message();
         return false;
     }
 
-    constexpr u64                 FnvOffset = 14695981039346656037ULL;
-    constexpr u64                 FnvPrime  = 1099511628211ULL;
-    std::array<char, 1024 * 1024> buffer{};
-    u64                           value = FnvOffset;
-    size                                = 0;
-    while (file)
+    std::string observed;
+    if (!Integrity::sha256_file(path, observed, error))
+        return false;
+    if (observed != expectedSha256)
     {
-        file.read(buffer.data(), std::streamsize(buffer.size()));
-        const auto bytes = file.gcount();
-        for (std::streamsize i = 0; i < bytes; ++i)
-        {
-            value ^= static_cast<unsigned char>(buffer[usize(i)]);
-            value *= FnvPrime;
-        }
-        size += u64(bytes);
-    }
-    if (!file.eof())
-    {
-        error = "failed while hashing book " + path.string();
+        error = std::string(label) + " SHA-256 mismatch: expected " + expectedSha256 + ", got "
+              + observed;
         return false;
     }
-
-    std::ostringstream text;
-    text << "fnv1a64:" << std::hex << std::uppercase << std::setw(16) << std::setfill('0') << value;
-    hash = text.str();
     return true;
 }
 
@@ -471,11 +488,16 @@ bool fast_file_hash(const std::filesystem::path& path,
 // session may use a different worker count.
 std::string identity_command(const Params&                params,
                              const std::filesystem::path& book,
+                             const std::filesystem::path& network,
                              const std::filesystem::path& out) {
     std::ostringstream command;
     command << "datagen out " << std::quoted(portable_path(out)) << " count " << params.count
             << " nodes " << params.nodes << " seed " << params.seed << " book "
             << std::quoted(params.book.empty() ? std::string("NONE") : portable_path(book))
+            << " book_sha256 " << params.bookSha256 << " network "
+            << std::quoted(portable_path(network)) << " network_sha256 " << params.networkSha256
+            << " producer_sha256 " << params.producerSha256 << " source_commit "
+            << params.sourceCommit << " source_dirty " << int(params.sourceDirty)
             << " random_move_count " << params.randomMoveCount << " random_move_min_ply "
             << params.randomMoveMinPly << " random_move_max_ply " << params.randomMoveMaxPly
             << " random_multi_pv " << params.randomMultiPv << " random_multi_pv_diff "
@@ -488,9 +510,10 @@ std::string identity_command(const Params&                params,
 
 std::string full_command(const Params&                params,
                          const std::filesystem::path& book,
+                         const std::filesystem::path& network,
                          const std::filesystem::path& out) {
     std::ostringstream command;
-    command << identity_command(params, book, out) << " threads " << params.threads;
+    command << identity_command(params, book, network, out) << " threads " << params.threads;
     if (params.resume)
         command << " --resume";
     return command.str();
@@ -519,6 +542,13 @@ bool write_resume_metadata(const std::filesystem::path& out,
          << "book_path " << std::quoted(metadata.bookPath) << '\n'
          << "book_size " << metadata.bookSize << '\n'
          << "book_hash " << std::quoted(metadata.bookHash) << '\n'
+         << "network_path " << std::quoted(metadata.networkPath) << '\n'
+         << "network_size " << metadata.networkSize << '\n'
+         << "network_hash " << std::quoted(metadata.networkHash) << '\n'
+         << "producer_size " << metadata.producerSize << '\n'
+         << "producer_hash " << std::quoted(metadata.producerHash) << '\n'
+         << "source_commit " << std::quoted(metadata.sourceCommit) << '\n'
+         << "source_dirty " << int(metadata.sourceDirty) << '\n'
          << "resume_count " << metadata.resumeCount << '\n';
     file.close();
     if (!file)
@@ -610,6 +640,25 @@ bool parse_resume_metadata_file(const std::filesystem::path& path,
             ok = bool(input >> metadata.bookSize);
         else if (key == "book_hash")
             ok = bool(input >> std::quoted(metadata.bookHash));
+        else if (key == "network_path")
+            ok = bool(input >> std::quoted(metadata.networkPath));
+        else if (key == "network_size")
+            ok = bool(input >> metadata.networkSize);
+        else if (key == "network_hash")
+            ok = bool(input >> std::quoted(metadata.networkHash));
+        else if (key == "producer_size")
+            ok = bool(input >> metadata.producerSize);
+        else if (key == "producer_hash")
+            ok = bool(input >> std::quoted(metadata.producerHash));
+        else if (key == "source_commit")
+            ok = bool(input >> std::quoted(metadata.sourceCommit));
+        else if (key == "source_dirty")
+        {
+            int dirty = -1;
+            ok        = bool(input >> dirty) && (dirty == 0 || dirty == 1);
+            if (ok)
+                metadata.sourceDirty = dirty != 0;
+        }
         else if (key == "resume_count")
             ok = bool(input >> metadata.resumeCount);
         else
@@ -632,9 +681,11 @@ bool parse_resume_metadata_file(const std::filesystem::path& path,
         return false;
     }
 
-    static const std::array<const char*, 11> Required = {
-      "schema",    "meta_version", "command",   "last_command", "format",      "format_version",
-      "record_size", "book_path",  "book_size", "book_hash",    "resume_count"};
+    static const std::array<const char*, 18> Required = {
+      "schema",       "meta_version",  "command",       "last_command",  "format",
+      "format_version", "record_size", "book_path",     "book_size",     "book_hash",
+      "network_path", "network_size",  "network_hash",  "producer_size", "producer_hash",
+      "source_commit", "source_dirty", "resume_count"};
     for (const char* key : Required)
         if (!seen.count(key))
         {
@@ -685,8 +736,7 @@ bool load_resume_metadata(const std::filesystem::path& out,
 
 bool validate_resume_metadata(const ResumeMetadata& metadata,
                               const std::string&    identity,
-                              u64                   bookSize,
-                              const std::string&    bookHash,
+                              const Params&         params,
                               std::string&          error) {
     if (metadata.metaVersion != ResumeMetaVersion || metadata.format != "tera-bin"
         || metadata.formatVersion != 1 || metadata.recordSize != TeraRecordSize)
@@ -700,11 +750,19 @@ bool validate_resume_metadata(const ResumeMetadata& metadata,
               + metadata.command + "]";
         return false;
     }
-    if (bookSize != metadata.bookSize || bookHash != metadata.bookHash)
+    if (params.bookSize != metadata.bookSize || params.bookSha256 != metadata.bookHash)
     {
-        error = "resume metadata mismatch for book contents: requested " + bookHash + " ("
-              + std::to_string(bookSize) + " bytes), stored " + metadata.bookHash + " ("
+        error = "resume metadata mismatch for book contents: requested " + params.bookSha256 + " ("
+              + std::to_string(params.bookSize) + " bytes), stored " + metadata.bookHash + " ("
               + std::to_string(metadata.bookSize) + " bytes)";
+        return false;
+    }
+    if (params.networkSize != metadata.networkSize || params.networkSha256 != metadata.networkHash
+        || params.producerSize != metadata.producerSize
+        || params.producerSha256 != metadata.producerHash
+        || params.sourceCommit != metadata.sourceCommit || params.sourceDirty != metadata.sourceDirty)
+    {
+        error = "resume metadata mismatch for authenticated producer/network/source identity";
         return false;
     }
     if (metadata.resumeCount >= std::numeric_limits<std::uint32_t>::max())
@@ -780,17 +838,27 @@ bool read_value(std::istream& args, T& value) {
 }
 
 bool parse_params(std::istream& args, Params& params, std::string& error) {
-    bool sawOut = false;
-    bool sawCount = false;
+    bool sawOut = false, sawCount = false, sawBook = false, sawBookSha256 = false;
+    bool sawNetwork = false, sawNetworkSha256 = false, sawProducerSha256 = false;
+
+    const auto first = [&](bool& seen, const std::string& name) {
+        if (seen)
+        {
+            error = "duplicate option '" + name + "'";
+            return false;
+        }
+        seen = true;
+        return true;
+    };
 
     std::string token;
     while (args >> token)
     {
         bool ok = true;
         if (token == "out")
-            ok = sawOut = read_path(args, params.out, false);
+            ok = first(sawOut, token) && read_path(args, params.out, false);
         else if (token == "count")
-            ok = sawCount = read_value(args, params.count);
+            ok = first(sawCount, token) && read_value(args, params.count);
         else if (token == "nodes")
             ok = read_value(args, params.nodes);
         else if (token == "threads")
@@ -798,7 +866,15 @@ bool parse_params(std::istream& args, Params& params, std::string& error) {
         else if (token == "seed")
             ok = read_value(args, params.seed);
         else if (token == "book")
-            ok = read_path(args, params.book, true);
+            ok = first(sawBook, token) && read_path(args, params.book, true);
+        else if (token == "book_sha256")
+            ok = first(sawBookSha256, token) && read_value(args, params.bookSha256);
+        else if (token == "network")
+            ok = first(sawNetwork, token) && read_path(args, params.network, true);
+        else if (token == "network_sha256")
+            ok = first(sawNetworkSha256, token) && read_value(args, params.networkSha256);
+        else if (token == "producer_sha256")
+            ok = first(sawProducerSha256, token) && read_value(args, params.producerSha256);
         else if (token == "random_move_count")
             ok = read_value(args, params.randomMoveCount);
         else if (token == "random_move_min_ply")
@@ -834,15 +910,41 @@ bool parse_params(std::istream& args, Params& params, std::string& error) {
 
         if (!ok)
         {
-            error = "invalid or missing value for '" + token + "'";
+            if (error.empty())
+                error = "invalid or missing value for '" + token + "'";
             return false;
         }
     }
+
+    params.bookSha256     = Integrity::normalize_sha256(std::move(params.bookSha256));
+    params.networkSha256  = Integrity::normalize_sha256(std::move(params.networkSha256));
+    params.producerSha256 = Integrity::normalize_sha256(std::move(params.producerSha256));
+
+    const bool sourceCommitValid =
+      params.sourceCommit.size() == 40
+      && std::all_of(params.sourceCommit.begin(), params.sourceCommit.end(), [](unsigned char c) {
+             return std::isxdigit(c) != 0;
+         })
+      && params.sourceCommit != "0000000000000000000000000000000000000000";
 
     if (!sawOut || params.out.empty())
         error = "out is required";
     else if (!sawCount)
         error = "count is required";
+    else if (!sawBook || !sawBookSha256 || !sawNetwork || !sawNetworkSha256
+             || !sawProducerSha256)
+        error = "authenticated datagen requires book, book_sha256, network, network_sha256, and "
+                "producer_sha256";
+    else if ((params.book.empty()) != (params.bookSha256 == "none")
+             || (!params.book.empty() && !Integrity::is_sha256(params.bookSha256)))
+        error = "book and book_sha256 must be NONE together or identify one authenticated file";
+    else if (params.network.empty() || !Integrity::is_sha256(params.networkSha256))
+        error = "network must identify an authenticated file and network_sha256 must be 64 hex "
+                "digits";
+    else if (!Integrity::is_sha256(params.producerSha256))
+        error = "producer_sha256 must contain 64 hex digits";
+    else if (!sourceCommitValid)
+        error = "build lacks an authenticated 40-hex source commit";
     else if (!params.count)
         error = "count must be greater than zero";
     else if (!params.nodes)
@@ -1153,6 +1255,16 @@ bool write_metadata(const Params&                   params,
     file << std::fixed << std::setprecision(6) << "{\n"
          << "  \"format\": \"tera-bin\",\n"
          << "  \"version\": 1,\n"
+         << "  \"provenance_schema\": \"terachess-datagen-provenance-v1\",\n"
+         << "  \"source_commit\": \"" << params.sourceCommit << "\",\n"
+         << "  \"source_dirty\": " << (params.sourceDirty ? "true" : "false") << ",\n"
+         << "  \"producer_sha256\": \"" << params.producerSha256 << "\",\n"
+         << "  \"producer_bytes\": " << params.producerSize << ",\n"
+         << "  \"network_sha256\": \"" << params.networkSha256 << "\",\n"
+         << "  \"network_bytes\": " << params.networkSize << ",\n"
+         << "  \"network_arch_hash\": \"" << TeraNNUE::descriptor_hash_hex() << "\",\n"
+         << "  \"book_sha256\": \"" << params.bookSha256 << "\",\n"
+         << "  \"book_bytes\": " << params.bookSize << ",\n"
          << "  \"record_size\": " << TeraRecordSize << ",\n"
          << "  \"records\": " << params.count << ",\n"
          << "  \"source_positions\": " << sourcePositions << ",\n"
@@ -1585,17 +1697,53 @@ bool run(std::istream&                               args,
     const bool haveDebug    = std::filesystem::exists(debugTxt, ec);
     const bool haveComplete = haveOut && haveMeta && (!params.debugSample || haveDebug);
 
-    if (params.resume && haveComplete)
-    {
-        sync_cout << "info string datagen resume: " << params.out.string()
-                  << " and its sidecars already exist; generation is already complete" << sync_endl;
-        return true;
-    }
-    if (haveOut || haveMeta || haveDebug)
+    if (!(params.resume && haveComplete) && (haveOut || haveMeta || haveDebug))
     {
         error = "output or one of its final sidecars already exists; generation is already "
                 "complete or was interrupted after publication";
         return false;
+    }
+
+    if (!binaryPath)
+    {
+        error = "cannot authenticate producer without the executable path";
+        return false;
+    }
+
+    // Authenticate every external input before creating a directory, resume
+    // sidecar, or shard. OpenBench v41 independently freezes the same values;
+    // this check makes the generated chunk self-defending as well.
+    const auto normalizedProducer = normalized_path(*binaryPath);
+    const auto normalizedNetwork  = normalized_path(params.network);
+    if (!authenticate_file(normalizedProducer, params.producerSha256, "producer",
+                           params.producerSize, error)
+        || !authenticate_file(normalizedNetwork, params.networkSha256, "network",
+                              params.networkSize, error))
+        return false;
+
+    if (!TeraNNUE::active())
+    {
+        error = "authenticated network is not active; material fallback is forbidden";
+        return false;
+    }
+    if (TeraNNUE::network().sha256() != params.networkSha256)
+    {
+        error = "active in-memory network SHA-256 mismatch: expected " + params.networkSha256
+              + ", loaded " + TeraNNUE::network().sha256();
+        return false;
+    }
+
+    // Book: authenticated FEN lines, or explicit NONE for builtin startpos.
+    std::vector<std::string> book;
+    std::filesystem::path    normalizedBook;
+    if (params.book.empty())
+        book.emplace_back(StartFEN);
+    else
+    {
+        normalizedBook = normalized_path(params.book);
+        if (!authenticate_file(normalizedBook, params.bookSha256, "book", params.bookSize, error)
+            || !load_book(normalizedBook, book, error))
+            return false;
     }
 
     const auto parent = params.out.parent_path();
@@ -1609,28 +1757,21 @@ bool run(std::istream&                               args,
         }
     }
 
-    // Book: FEN lines, one per line; NONE (or omitted) means start position.
-    std::vector<std::string> book;
-    std::filesystem::path    normalizedBook;
-    u64                      bookSize = 0;
-    std::string              bookHash = "none";
-    if (params.book.empty())
-        book.emplace_back(StartFEN);
-    else
-    {
-        if (!std::filesystem::is_regular_file(params.book, ec))
-        {
-            error = "book does not exist: " + params.book.string();
-            return false;
-        }
-        normalizedBook = normalized_path(params.book);
-        if (!fast_file_hash(normalizedBook, bookSize, bookHash, error)
-            || !load_book(normalizedBook, book, error))
-            return false;
-    }
-
     const auto        normalizedOut = normalized_path(params.out);
-    const std::string identity      = identity_command(params, normalizedBook, normalizedOut);
+    const std::string identity =
+      identity_command(params, normalizedBook, normalizedNetwork, normalizedOut);
+
+    if (params.resume && haveComplete)
+    {
+        ResumeMetadata completeMetadata;
+        if (!load_resume_metadata(params.out, completeMetadata, error)
+            || !validate_resume_metadata(completeMetadata, identity, params, error))
+            return false;
+        sync_cout << "info string datagen resume: " << params.out.string()
+                  << " and its authenticated sidecars already exist; generation is complete"
+                  << sync_endl;
+        return true;
+    }
 
     ResumeMetadata         resumeMetadata;
     std::vector<ShardInfo> existingShards;
@@ -1638,7 +1779,7 @@ bool run(std::istream&                               args,
     if (params.resume)
     {
         if (!load_resume_metadata(params.out, resumeMetadata, error)
-            || !validate_resume_metadata(resumeMetadata, identity, bookSize, bookHash, error))
+            || !validate_resume_metadata(resumeMetadata, identity, params, error))
             return false;
         if (!discover_shards(params.out, true, existingShards, error))
             return false;
@@ -1654,7 +1795,8 @@ bool run(std::istream&                               args,
 
         params.resumeNumber        = resumeMetadata.resumeCount + 1;
         resumeMetadata.resumeCount = params.resumeNumber;
-        resumeMetadata.lastCommand = full_command(params, normalizedBook, normalizedOut);
+        resumeMetadata.lastCommand =
+          full_command(params, normalizedBook, normalizedNetwork, normalizedOut);
         if (!write_resume_metadata(params.out, resumeMetadata, error))
             return false;
 
@@ -1693,10 +1835,18 @@ bool run(std::istream&                               args,
             return false;
         }
         resumeMetadata.command     = identity;
-        resumeMetadata.lastCommand = full_command(params, normalizedBook, normalizedOut);
+        resumeMetadata.lastCommand =
+          full_command(params, normalizedBook, normalizedNetwork, normalizedOut);
         resumeMetadata.bookPath = params.book.empty() ? "NONE" : portable_path(normalizedBook);
-        resumeMetadata.bookSize = bookSize;
-        resumeMetadata.bookHash = bookHash;
+        resumeMetadata.bookSize = params.bookSize;
+        resumeMetadata.bookHash = params.bookSha256;
+        resumeMetadata.networkPath = portable_path(normalizedNetwork);
+        resumeMetadata.networkSize = params.networkSize;
+        resumeMetadata.networkHash = params.networkSha256;
+        resumeMetadata.producerSize = params.producerSize;
+        resumeMetadata.producerHash = params.producerSha256;
+        resumeMetadata.sourceCommit = params.sourceCommit;
+        resumeMetadata.sourceDirty = params.sourceDirty;
         if (!write_resume_metadata(params.out, resumeMetadata, error))
             return false;
     }

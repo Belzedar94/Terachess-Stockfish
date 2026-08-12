@@ -176,7 +176,8 @@ cd ../tools
 python parity_gate.py --engine ../src/stockfish.exe \
     --net ../nets/tera-net2.tnn --ref ../data/pref_n2.jsonl   # PASS (0 cp)
 python check_label_units.py --engine ../src/stockfish.exe \
-    --data ../data/c3_final.bin --positions 150               # PASS, pendiente ~1.0
+    --net ../nets/tera-net2.tnn \
+    --data ../data/c3_final.bin --positions 150               # PASS, NNUE activa, pendiente ~1.0
 ```
 
 Si algo de esto NO está verde, no construyas encima: diagnostica primero.

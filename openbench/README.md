@@ -6,13 +6,14 @@ copiar al servidor; el motor cumple ya el contrato de `datagen-mode.md`.
 
 ## Checklist de adopción (3 pasos del contrato)
 
-1. **Comando datagen in-engine** — HECHO. Una línea por stdin UCI, acepta
-   semilla/count/salida/hilos, deja UN archivo final y sale con código 0:
+1. **Comando datagen in-engine** — HECHO. Una línea por stdin UCI, autentica
+   productor/red/libro, deja UN archivo final y sale con código 0:
    ```
-   datagen book {BOOK} nodes 12000 count {COUNT} threads {THREADS} seed {SEED} out {OUT}
+   datagen book {BOOK} book_sha256 {BOOK_SHA256} network {NETWORK} network_sha256 {NETWORK_SHA256} producer_sha256 {PRODUCER_SHA256} nodes 8000 count {COUNT} threads {THREADS} seed {SEED} out {OUT} write_min_ply 6
    ```
-   Verificado: tamaño exacto `32 + 144·N`, determinismo por semilla (sha256
-   idéntico en 3 corridas), resume idempotente, shards retenidos ante fallo.
+   Verificado: los cinco negativos de identidad fallan antes de crear artefactos;
+   tamaño exacto `32 + 144·N`, determinismo por semilla (sha256 idéntico en 3
+   corridas), resume autenticado idempotente, shards retenidos ante fallo.
 
 2. **Formato y auditoría propios** — HECHO. `tera-bin v1` (`docs/tera-bin-v1.md`),
    espejo Python `tools/terabin.py`, auditor `tools/audit_terabin.py --strict`,
@@ -20,17 +21,16 @@ copiar al servidor; el motor cumple ya el contrato de `datagen-mode.md`.
    OpenBench trata cada chunk como blob opaco; la validación de registros,
    deduplicación y merge son responsabilidad nuestra (offline).
 
-3. **Crear el test** en `/newDatagen/` con el preset de abajo. Dimensionado de
-   chunk: a ~213 pos/s agregadas medidas con 20 hilos, 20.000 posiciones por
-   chunk ≈ 1,5 min por worker; para el objetivo de 20–40 min por chunk del
-   contrato usar 10.000–20.000 posiciones **por worker asignado**, ajustando
-   `datagen_positions_per_chunk` al `-T` típico de la granja.
+3. **Crear el test** en `/newDatagen/` con protocolo de publicación **41** y
+   `{PRODUCER_SHA256}`. Con net-2 se parte de **88,6 pos/s agregadas a T24 y
+   8.000 nodos**: chunks de 100.000 posiciones estiman ~18,8 min en la torre.
+   El canary inicial puede ser menor; la campaña se dimensiona a 20–40 min por
+   chunk usando la velocidad observada por OpenBench, no el bench UCI.
 
 ## Instalación en el servidor
 
 ```bash
 scp openbench/Terachess-Stockfish.json <server>:/opt/openbench/Engines/
-scp books/tera_openings_v1.epd <server>:/opt/openbench/Books/
 ssh <server> systemctl restart openbench
 ```
 (El servidor recalcula SHA-256 y tamaño de todo lo subido; no confía en el
@@ -56,8 +56,10 @@ eso. Medido: 4,2 GB con 20 hilos de datagen.
 ## Estado
 
 - [x] Comando datagen conforme al contrato
+- [x] Build/bench público con net-2: **32.541** nodos; ausencia de red → exit 1
+- [x] Identidad v41 dentro del chunk (productor/red/libro + resume v2)
 - [x] Formato + auditor + round-trip doble
 - [x] Preset JSON escrito
 - [ ] Libro `tera_openings_v1.epd` generado y subido
 - [ ] Preset instalado en el servidor y primer workload lanzado
-- [ ] Bench de referencia del cliente (`bench` a secas) registrado en el commit
+- [x] Bench de referencia del cliente (`bench` a secas) registrado

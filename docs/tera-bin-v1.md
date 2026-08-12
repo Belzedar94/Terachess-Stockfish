@@ -67,13 +67,19 @@ Total 101 bits; el resto de los 16 B a cero. **Padding no-cero = registro corrup
 ## Sidecars
 
 - `<out>.meta.json`: format:"tera-bin", version:1, records, source_positions, games,
-  game_results{w,b,d}, seconds, threads, nodes, seed, positions_per_second, workers[].
+  game_results{w,b,d}, seconds, threads, nodes, seed, positions_per_second, workers[];
+  además `provenance_schema:terachess-datagen-provenance-v1`, commit/dirty bit,
+  SHA-256 y tamaño del productor, red y libro, y `network_arch_hash`.
 - `<out>.debug.txt` (con `--debug-sample N`): líneas `FEN | score | result` para el
   round-trip doble.
+- `<out>.resume`: metadata operativa versión 2. Congela la misma procedencia y
+  rechaza cambios de productor/red/libro/source incluso si el output final ya
+  existe. Es un sidecar; **no cambia ningún byte** del contrato `TC01`.
 
 ## Procedencia
 
-Cada campaña registra: commit del motor, bench, comando completo, semilla base,
-SHA-256 del libro y de la red (si aplica), y el receipt del auditor con histogramas
+Cada comando exige y autentica antes de crear shards: commit del motor, SHA-256
+del productor, de la red activa y del libro (`NONE`/`NONE` para startpos builtin).
+Cada campaña registra además bench, comando completo, semilla base y el receipt del auditor con histogramas
 (WDL, material, fase, eval, ply, records/partida). La política de muestreo vive en el
 manifest de campaña, no en el formato.

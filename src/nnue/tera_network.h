@@ -102,6 +102,7 @@ class Network {
 
     bool               loaded() const { return isLoaded; }
     const std::string& file() const { return filePath; }
+    const std::string& sha256() const { return fileSha256; }
 
     const std::int16_t* ft_row(int f) const { return ftWeights.get() + usize(f) * L1; }
     const std::int16_t* ft_bias() const { return ftBias; }
@@ -116,6 +117,7 @@ class Network {
     std::int16_t                              ftBias[L1] = {};
     StackWeights                              stacks[OutputBuckets] = {};
     std::string                               filePath;
+    std::string                               fileSha256;
     bool                                      isLoaded = false;
 };
 

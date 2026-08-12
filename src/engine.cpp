@@ -292,13 +292,15 @@ std::optional<std::string> Engine::set_eval_file(const std::string& path) {
 
     if (TeraNNUE::network().load(path, error))
         return std::string("EvalFile: loaded '" + path + "' (arch_hash "
-                           + TeraNNUE::descriptor_hash_hex() + ")");
+                           + TeraNNUE::descriptor_hash_hex() + ", file_sha256 "
+                           + TeraNNUE::network().sha256() + ")");
 
     // Second chance next to the binary, as Stockfish does for its own nets.
     const std::string sideBySide = (binaryDirectory / path_from_utf8(path)).u8string();
     if (sideBySide != path && TeraNNUE::network().load(sideBySide, secondError))
         return std::string("EvalFile: loaded '" + sideBySide + "' (arch_hash "
-                           + TeraNNUE::descriptor_hash_hex() + ")");
+                           + TeraNNUE::descriptor_hash_hex() + ", file_sha256 "
+                           + TeraNNUE::network().sha256() + ")");
 
     // Fail closed: no adaptation, no partial load, material evaluation stays.
     TeraNNUE::network().unload();

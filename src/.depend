@@ -5,7 +5,8 @@ datagen.o: datagen.cpp datagen.h engine.h misc.h history.h memory.h \
  types.h tune.h position.h bitboard.h numa.h shm.h search.h movegen.h \
  nnue/tera_accumulator.h nnue/../types.h nnue/../tune.h \
  nnue/tera_features.h score.h timeman.h thread.h thread_win32_osx.h tt.h \
- ucioption.h notation.h uci.h
+ ucioption.h nnue/tera_network.h nnue/../misc.h nnue/tera_accumulator.h \
+ notation.h sha256.h uci.h
 evaluate.o: evaluate.cpp evaluate.h types.h misc.h tune.h \
  nnue/tera_features.h nnue/../types.h nnue/../tune.h nnue/tera_network.h \
  nnue/../misc.h nnue/tera_accumulator.h nnue/tera_features.h position.h \
@@ -62,6 +63,7 @@ score.o: score.cpp score.h types.h misc.h tune.h uci.h engine.h history.h \
  nnue/tera_features.h timeman.h thread.h thread_win32_osx.h tt.h \
  ucioption.h notation.h
 memory.o: memory.cpp memory.h types.h misc.h tune.h
+sha256.o: sha256.cpp sha256.h
 tera_features.o: nnue/tera_features.cpp nnue/tera_features.h \
  nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/../bitboard.h \
  nnue/../types.h nnue/../position.h nnue/../bitboard.h
@@ -73,4 +75,4 @@ tera_accumulator.o: nnue/tera_accumulator.cpp nnue/tera_accumulator.h \
 tera_network.o: nnue/tera_network.cpp nnue/tera_network.h nnue/../misc.h \
  nnue/../types.h nnue/../misc.h nnue/../tune.h nnue/tera_accumulator.h \
  nnue/tera_features.h nnue/../memory.h nnue/../types.h nnue/../position.h \
- nnue/../bitboard.h
+ nnue/../bitboard.h nnue/../sha256.h
