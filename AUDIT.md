@@ -932,6 +932,13 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
   terminando el lease previo de Horde #332. La máquina Linux 16 llevaba sin
   actualizar desde **12:51:07 UTC**. No se detuvo, preemptó ni repriorizó
   ninguna carga.
+- `tools/check_terabin_roundtrip.py` hace reproducible el gate byte a byte del
+  blob de OpenBench sin exigir el sidecar debug que la plataforma no conserva.
+  Antes de usar la sonda nueva sobre #353 se validó contra el smoke conocido:
+  el arnés motor↔Python reprodujo **8/8**, la auditoría estricta aceptó los
+  **16** registros y la sonda nueva dio **16/16** sobre los mismos 2.336 B.
+  El control negativo `--expected-records 17` falló cerrado con exit **2** al
+  leer el header real de 16.
 
 **Incidentes y diagnóstico**:
 
