@@ -882,3 +882,82 @@ validación decisiva del include será el build Linux de OpenBench; la campaña 
 **Learning**: un build `native` validado solo en Windows no cubre headers SIMD
 en GNU/Linux. Toda arquitectura que OpenBench pueda seleccionar necesita al
 menos un build real en ese sistema antes del primer workload científico.
+
+### 2026-08-12 — Deploy r2 y canary oficial #353: **EN CURSO**
+
+**Hipótesis**: el reemplazo de #352 debe ser un workload nuevo cuyo contrato
+v41 fije el commit con el arreglo AVX-512. Debe conservar prioridad **302**,
+sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
+10 M después de que su único chunk pase todos los gates ya congelados.
+
+**Cambios y validación operativa**:
+
+- `711177d601f5e16341277e81a141c63d0e61ef52` publicó el include condicional
+  de `<immintrin.h>` con `Bench: 32541`. El preset r2 fija ese commit,
+  campaña `terachess-net2-regime-20260812-r2` e IDs externos
+  `canary-20k-r2`/`train-10m-r2`; el JSON mide **2.652 B** y tiene SHA-256
+  `31256b0fcc55976a810748fdb196a56b30a245affc42f674ddb35058f6883c12`.
+  OpenBench central lo publicó en `91d5f3b1`.
+- Producción seguía con su árbol sucio, por lo que se desplegó solo ese JSON,
+  después de comparar hash y bytes, con backup
+  `/opt/openbench/Engines/Terachess-Stockfish.json.bak-20260812-91d5f3b1`.
+  `manage.py check` dio **0** errores y
+  `makemigrations --check --dry-run` **0** cambios. Se reinició únicamente el
+  servicio `openbench`; quedó activo, Gunicorn escuchando en
+  `127.0.0.1:8000` y el endpoint canónico público
+  `https://belzedar.duckdns.org/api/config/` respondió **HTTP 200**.
+- Antes de escribir DB, el verificador canónico de creación resolvió GitHub a
+  commit solicitado/resuelto `711177d…`, bench **32.541**, disponibilidad de
+  artefactos `true` y **0 errores**. Las precondiciones midieron #352 cerrado
+  con 0 partidas/0 chunks completos, red net-2 default y 0 colisiones de
+  campaña/slot r2.
+- La ruta canónica `create_workload(..., "DATAGEN")` creó #**353** y devolvió
+  redirect **302** a `/index/`. Readback transaccional: aprobado, no terminado
+  ni borrado, prioridad **302**, throughput **1.000**, 20.000 posiciones en un
+  chunk `PENDING`, seed **202608120000000**, 0 intentos, máquina nula y 0
+  registros; el perfil pasó de 257 a **258** workloads y se creó exactamente
+  el evento `CREATE P=302 TP=1000`.
+- Contratos de #353, todos recomputados vigentes: publicación
+  `96f6e0a7a8fb65c17293a54ddccb42ad71b0ab5f981478df4e968438b8fb344d`,
+  productor
+  `2e92f4afcb63dc5da336a40f354697d3cbf35a569620ef3c61571033116aa853`
+  y entorno
+  `310d337236145781f7ebf75437014f9eda5e359dcc99a8323d8f607f316e3e36`.
+  La publicación congela net-2 en **56.858.966 B**, SHA-256
+  `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`,
+  startpos builtin y productor obligatorio.
+- Orden observado sin mutaciones adicionales: Spell #351 ya había terminado
+  por bound alto; #353 era la única carga activa con prioridad **302**. El
+  worker T24 conservó PID **27540** y su comando `-T 24 -N 1`; estaba
+  terminando el lease previo de Horde #332. La máquina Linux 16 llevaba sin
+  actualizar desde **12:51:07 UTC**. No se detuvo, preemptó ni repriorizó
+  ninguna carga.
+
+**Incidentes y diagnóstico**:
+
+1. El primer intento de deploy construyó una orden SSH con sustituciones
+   `$(...)` que PowerShell evaluó localmente. Falló **antes de mutar**: el JSON
+   activo conservó su hash anterior y el servicio siguió activo. Se rechazó
+   el intento y se repitió con un script literal, verificando staging, destino
+   y backup por hash/tamaño.
+2. El primer health-check posterior al reinicio exigía erróneamente HTTP 200
+   en `/api/config` sin barra; el comportamiento canónico es redirect **301**.
+   La sonda se marcó inválida. Servicio, socket y `/api/config/` público
+   confirmaron después el estado verde con HTTP **200**.
+3. El primer dry-run de creación importó `verify_workload` fuera del orden de
+   carga de la vista y encontró un ciclo de imports de Django. Terminó con exit
+   **1** y no escribió DB. Importar primero `OpenBench.views`, como hace la
+   aplicación, dio 0 errores; el script creador repitió todas las
+   precondiciones dentro de la transacción.
+
+**Decisión provisional**: #353 está en cola oficial con identidad correcta y
+sin cambiar prioridades. La campaña de 10 M sigue **BLOQUEADA**. Faltan el
+build Linux real, el chunk completo, el recibo/artefacto autenticados, auditoría
+estructural sin warnings, round-trip **20.000/20.000** y gate de unidades
+NNUE **300/300** con los bounds congelados.
+
+**Learnings provisionales**: (1) los health-checks deben usar la ruta canónica
+antes de interpretar un redirect como caída; (2) un script operativo remoto
+debe ser literal cuando contiene sintaxis que también entiende PowerShell;
+(3) la validación seca debe reproducir el orden de imports de la aplicación y
+probar explícitamente que no creó filas.
