@@ -975,6 +975,30 @@ sin modificar ni interrumpir otra carga, y solo se podrá abrir la campaña de
    porque una orden posterior sí pasó. Ninguno invocó el compilador. Se
    rechazaron los tres y un script Bash literal, con cwd y TMP/TEMP explícitos,
    produjo el build medido arriba.
+5. A las **15:44:29 CEST** apareció en el cliente local un `openbench.exit` de
+   0 B no creado por este flujo. El worker terminó primero su lote ya concedido
+   de Horde #332 (hasta la partida **1.430**) y salió; el supervisor lo
+   relanzó con el mismo `-T 24 -N 1`. El flag aún presente hizo que ese proceso
+   reclamara #353, construyera y bencheara correctamente, pero matara el
+   generador antes de crear output. Evidencia servidor del intento 1: máquina
+   **12**, 0 bytes, productor PE disponible **4.326.374 B**, SHA-256
+   `4031535940f205704cfde57233e66e2960872fbea80fa7880eef9e1bcf4237b5`,
+   commit/contrato exactos. Tras comprobar muerto el PID anterior **27540** se
+   eliminó solo el flag; readback: un worker T24, flag ausente. La descarga del
+   CAS oficial reprodujo hash, bytes y magic `4d5a`. El primer recinto local
+   para sondarlo fue inválido: instaló la red como `tera-net2.tnn`, pero el
+   build OpenBench horneó el basename `05162B61`; el arranque fail-closed salió
+   **1** antes de aceptar el `setoption`. Tras añadir ese archivo solo después
+   de verificar sus **56.858.966 B** y SHA completo, el productor oficial
+   reprodujo la medición conocida: NNUE **150/150**, pendiente **1,044**,
+   correlación **0,991**, PASS.
+6. El stop local no llama a `requeue_chunk`: dejó el intento 1 en `RUNNING`
+   hasta expirar aunque el worker ya atendía Spell SPSA #170. Con CAS sobre
+   test 353/chunk 0/máquina 12/intento 1, la función canónica de servidor lo
+   devolvió a `PENDING`, conservó `attempts=1`, limpió lease/productor y anotó
+   el motivo; evento `REQUEUE chunk 0 after local exit (attempt 1)`. Readback:
+   prioridad **302**, 0 registros, 0 bytes y máquina nula. No se interrumpió el
+   Spell que el scheduler había concedido durante esa ventana.
 
 **Decisión provisional**: #353 está en cola oficial con identidad correcta y
 sin cambiar prioridades. La campaña de 10 M sigue **BLOQUEADA**. Faltan el
