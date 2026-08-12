@@ -1052,3 +1052,60 @@ debe ser literal cuando contiene sintaxis que también entiende PowerShell;
 probar explícitamente que no creó filas; (4) un canary de datos puede quedar
 verde sin cubrir la plataforma que motivó su relanzamiento: ambas evidencias
 son gates distintos y no se sustituyen entre sí.
+
+---
+
+## 2026-08-12 — Campaña de régimen net-2 10 M: **EN COLA** (#361)
+
+**Hipótesis**: tras el PASS completo de datos del canary #353, la campaña de
+10 M puede quedar creada y visible en el OpenBench oficial sin consumir trabajo
+ni alterar el orden de la flota mientras no haya worker. El propietario autorizó
+explícitamente encolarla antes de resolver la deuda del build Linux; esa
+autorización cambia la decisión operativa, pero no reclasifica el gate Linux
+pendiente como PASS.
+
+**Cambios**:
+
+- Sin cambios de motor, red, formato ni prioridad. El dry-run canónico
+  `verify_workload(request, "DATAGEN")` dio **0 errores** y resolvió el commit
+  solicitado al pin `711177d601f5e16341277e81a141c63d0e61ef52`, bench
+  **32.541**, red default `tera-net2.tnn` y artifacts disponibles.
+- La ruta canónica `create_workload(request, "DATAGEN")`, dentro de una
+  transacción con precondiciones fail-closed, creó el workload oficial
+  **#361** (`train-10m-r2`). Respuesta **302** a `/index/`; exactamente un
+  evento `belzedar: CREATE P=50 TP=1000`; contador del perfil **258 → 259**.
+- Contrato congelado: campaña `terachess-net2-regime-20260812-r2`, rol
+  `train`, cohort `net2-n8000-startpos-v1`, **10.000.000** registros,
+  **100.000** por chunk, **100** chunks, seed **202608120100000**, prioridad
+  **50**, throughput **1.000**, startpos, 8.000 nodos y net-2.
+
+**Validación** (readback independiente a las **14:48:26,741 UTC**):
+
+- #361 aprobado, no terminado ni borrado, **0** registros, **0/100** chunks;
+  los 100 estaban `PENDING`, intentos **0**, `machine_id=null`, error vacío y
+  sumaban exactamente **10.000.000** posiciones.
+- Red: **56.858.966 B**, SHA-256
+  `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`.
+  Los tres contratos recomputaron vigentes: publicación
+  `f1c86e3f55790436947d4da3b3ad2a9c299bd5bc52d8a1815b047d2106c046e9`,
+  productor
+  `2e92f4afcb63dc5da336a40f354697d3cbf35a569620ef3c61571033116aa853`
+  y entorno
+  `310d337236145781f7ebf75437014f9eda5e359dcc99a8323d8f607f316e3e36`.
+- Estado local observado después de crearla: ningún proceso Python con
+  `client.py`; `openbench.exit` conservado byte a byte en
+  `openbench-spell/Client` (**2 B**, creado a las **16:04:42 CEST**). No se
+  borró el flag, no se relanzó el supervisor y no se tocó ningún workload
+  Spell ni ninguna prioridad.
+
+**Decisión**: campaña **CREADA Y EN COLA**, deliberadamente inerte hasta que el
+propietario reactive el worker. La prioridad queda congelada en **50**, por
+debajo de las cargas de juego. La deuda Linux de `711177d…` sigue abierta y se
+registrará como tal hasta que un build real admitido por OpenBench la resuelva;
+ningún resultado de #361 podrá usarse para borrar retrospectivamente ese gate.
+
+**Learnings**: (1) una autorización del propietario puede aceptar el riesgo de
+encolar trabajo sin alterar el estado epistemológico de un gate; (2) crear una
+carga no equivale a arrancarla: `PENDING`, intentos 0 y máquina nula son el
+recibo falsable; (3) una prioridad declarada forma parte del orden contractual
+y no se eleva para compensar la ausencia temporal de workers.
