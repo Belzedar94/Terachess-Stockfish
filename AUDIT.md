@@ -818,7 +818,10 @@ permanece
 `audit_terabin --strict`, round-trip byte a byte y
 `check_label_units --net`. La equivalencia motor↔Python con sidecar ya pasó en
 el preflight; OpenBench v41 publica el blob único y no conserva sidecars del
-worker.
+worker. Gate congelado antes de ver datos: header **20.000/20.000**, auditoría
+estructural completa sin warnings, `pack(unpack(raw)) == raw` **20.000/20.000**
+y unidades con `--positions 300 --min-abs 150`, exigiendo además muestra exacta
+300/300, NNUE 300/300, pendiente en **[0,8; 1,25]** y correlación **≥0,9**.
 
 **Learnings provisionales**: (1) medir todo activo antes de anunciar bytes;
 (2) el hash corto de OpenBench solo localiza el objeto, el contrato v41 debe
