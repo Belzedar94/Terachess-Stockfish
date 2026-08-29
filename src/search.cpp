@@ -1125,7 +1125,8 @@ moves_loop:  // When in check, search starts here
         if (!rootNode && pos.non_pawn_material(us) && !is_loss(bestValue))
         {
             // Skip quiet moves if movecount exceeds our threshold
-            const int baselineLmpThreshold = (3 + depth * depth) / (2 - improving);
+            const int baselineLmpThreshold =
+              std::max(1, 3 * ((3 + depth * depth) / (2 - improving)) / 4);
 #ifdef TERA_LMP_TRACE
             // Baseline mode replays from the exact live LMP trigger/state and
             // labels only lenient policies. U3/4 is a separate direction-control
