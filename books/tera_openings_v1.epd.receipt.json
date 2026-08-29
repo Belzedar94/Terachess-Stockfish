@@ -1,0 +1,31 @@
+{
+  "engine": {
+    "name": "terachess-353-attempt1.exe",
+    "sha256": "4031535940f205704cfde57233e66e2960872fbea80fa7880eef9e1bcf4237b5"
+  },
+  "network": {
+    "bytes": 56858966,
+    "name": "05162B61",
+    "sha256": "05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861"
+  },
+  "parameters": {
+    "diff_cp": 150,
+    "eval_limit": 800,
+    "lines": 5000,
+    "max_plies": 16,
+    "min_plies": 8,
+    "multipv": 6,
+    "nodes": 5000,
+    "seed": 2026
+  },
+  "result": {
+    "bytes": 911542,
+    "discarded": 12,
+    "elapsed_seconds": 1087.503,
+    "lines": 5000,
+    "name": "tera_openings_v1.epd",
+    "sha256_raw": "1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7",
+    "sha256_text": "1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7"
+  },
+  "schema": "terachess-opening-book-receipt-v1"
+}

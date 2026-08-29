@@ -44,8 +44,8 @@ cliente.)
 | `test_confidence` | `[0.05, 0.05]` | α=β=0,05 |
 | `win_adj` | `movecount=6 score=5000` | Red de seguridad, NO mecanismo necesario: 6/6 partidas del piloto terminaron en mate real. Umbral alto porque la escala cp es Zillions×100 (Amazona=1020) |
 | `draw_adj` | `None` | Con ~0 % de tablas, adjudicar tablas solo introduciría ruido |
-| STC | `60.0+0.6` | Las partidas duran ~575 plies (~287 jugadas): con 8s+0.08 de ajedrez cada jugada tendría ~28 ms. 60+0.6 da ~200 ms/jugada, presupuesto táctico comparable al STC de Spell |
-| LTC | `180.0+1.8` | Escalón ×3 sobre STC |
+| STC | `60.0+0.6` | Con ~287,5 jugadas por bando, presupuesto nominal máximo `(60/287,5)+0,6` = **~809 ms/jugada**; el consumo real queda pendiente de workload `VALIDATION_ONLY` |
+| LTC | `180.0+1.8` | Escalón ×3: **~2.426 ms/jugada** disponibles; medir reloj y wall-time reales antes de estimar capacidad |
 | `FIXED NODES` | `N=10000` | Reproduce las sondas locales (`tools/parallel_match.py`), útil para comparar builds sin ruido de reloj |
 | Hash | 16 MB (STC) | Ojo: cada hilo ya consume ~200 MB en historiales (32 MiB × 4 continuation + resto). No subir Hash sin comprobar la RAM del worker |
 

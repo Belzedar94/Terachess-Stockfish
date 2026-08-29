@@ -1,0 +1,2 @@
+books/*.epd text eol=lf
+books/*.json text eol=lf

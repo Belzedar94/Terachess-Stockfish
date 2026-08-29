@@ -1,0 +1,16 @@
+{
+  "book": "tera_openings_v1.epd",
+  "bytes": 911542,
+  "elapsed_seconds": 44.881,
+  "errors": [],
+  "lines": 5000,
+  "opening_ply_max": 16,
+  "opening_ply_min": 8,
+  "oracles": [
+    "a",
+    "b"
+  ],
+  "schema": "terachess-opening-book-validation-v1",
+  "sha256_raw": "1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7",
+  "unique_lines": 5000
+}

@@ -53,21 +53,30 @@ implementada en `tools/sprt.py` (LLR = n·(s₁−s₀)·(x̄ − (s₀+s₁)/2)
 
 A ~23 s por partida y 20 procesos en paralelo (`tools/parallel_match.py`):
 **~13 min por cada 670 partidas**, ~1,6 h para 5.000. Presupuesto viable.
+Este cálculo describe exclusivamente las sondas locales a **10.000 nodos**;
+no es un pronóstico de los presets STC/LTC con reloj y no se usará para
+dimensionar OpenBench hasta completar el smoke oficial de §5.
 
 **Paso a `[0.00, 3.00]`** cuando dos SPRT consecutivos pasen con <3.000
 partidas (síntoma de que la fruta baja se acabó). Política heredada de Spell.
 
 ## 5. Control de tiempo
 
-Equivalencia derivada de la longitud de partida, no copiada de ajedrez: con
-~287 jugadas por bando, un STC de ajedrez (8 s + 0,08) daría ~28 ms por jugada.
-Para un presupuesto táctico comparable:
+Presupuesto nominal derivado de la longitud de partida, no copiado de ajedrez:
+con 575 plies cada bando juega ~287,5 veces. La estimación original dividió
+solo el tiempo base entre las jugadas y **omitió el incremento**; por tanto sus
+~200/~600 ms por jugada eran incorrectos por un factor próximo a cuatro.
 
-| Preset | TC | ms/jugada aprox |
+| Preset | TC | presupuesto máximo nominal por jugada |
 |---|---|---|
-| STC | 60,0 + 0,6 | ~200 |
-| LTC | 180,0 + 1,8 | ~600 |
+| STC | 60,0 + 0,6 | `(60/287,5)+0,6` = **~809 ms** |
+| LTC | 180,0 + 1,8 | `(180/287,5)+1,8` = **~2.426 ms** |
 | FIXED NODES | N=10000 | (sin reloj; para sondas A/B entre builds propios) |
+
+Esos valores son tiempo **disponible**, no consumo observado: el motor puede
+acabar cada jugada antes. Antes del primer SPRT se exige un workload oficial
+`VALIDATION_ONLY` que registre tiempo real, reloj restante y percentiles por
+máquina; estas cifras no se usan para pronosticar duración ni capacidad.
 
 **LTC de confirmación siempre** antes de mergear: la lección del sign-flip de
 Spell (+30 STC / −27 LTC) aplica igual aquí y aún no hemos medido si Terachess
