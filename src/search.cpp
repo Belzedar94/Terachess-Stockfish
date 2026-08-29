@@ -1409,7 +1409,7 @@ moves_loop:  // When in check, search starts here
                 }
             }
 #endif
-            if (moveCount >= baselineLmpThreshold)
+            if (depth > 4 && moveCount >= baselineLmpThreshold)
             {
 #ifdef TERA_LMP_TRACE
                 if (lmpTraceRecord && !lmpTraceRecord->baselineTriggerRank)
