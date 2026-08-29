@@ -1305,3 +1305,68 @@ deuda escrita puede estar más desactualizada que el código y debe retirarse,
 no perpetuarse; (4) los parches upstream de fuerza son hipótesis nuevas cuando
 cambian tablero, unidades y red; (5) una clase ciega del 86,873 % justifica un
 arnés, no una cifra Elo.
+
+---
+
+## 2026-08-29 — Candidatas exactas y estado de #361: **PREPARADAS / NO ADMITIDAS A OB**
+
+**Hipótesis**: mientras T24 atiende cargas anteriores, se pueden aislar mejoras
+node-identical sin consumir hilos de motor ni alterar la cola. Ninguna rama es
+una candidata OpenBench hasta pasar build, fixtures/oráculo, paridad cuando
+aplique, bench firmado y NPS-check en un hueco real de recursos.
+
+**Cambios**: `main` y producción no cambiaron. Quedaron cuatro diffs sin commit
+en worktrees de `.scratch/`, todos basados en `5226966`:
+
+- `codex/legal-gives-check`: fusiona el do-and-revert de `legal()` y
+  `gives_check()` en búsqueda y conserva ambas implementaciones como aserción
+  debug (**67 inserciones/7 borrados**).
+- `codex/nnue-avx2-exact`: transpone los stacks solo en memoria y usa dot
+  products AVX2 `u8*i8`; TNN1, descriptor y `arch_hash` no cambian (**108
+  inserciones**, dos ficheros).
+- `codex/trust-generated-evasions`: evita el segundo `legal()` de las evasiones
+  ya filtradas por `generate<EVASIONS>`; el TT move sigue validándose y debug
+  reevalúa la premisa (**16 inserciones/3 borrados**).
+- `codex/continuation-init-once`: adaptación NCF de upstream `50221673`; solo
+  el thread NUMA 0 inicializa los **128 MiB** compartidos, eliminando ~**3 GiB**
+  de escrituras redundantes a T24 (**10 inserciones/7 borrados**).
+
+**Validación**:
+
+- Los cuatro worktrees pasan `git diff --check`; no se compiló, bencheó ni
+  ejecutó motor con T24 ocupado. A las **09:14:05,711 UTC**, PID 47696 seguía
+  vivo a T24 y su hijo PID 33972 era un DATAGEN de 3Check.
+- `curl -fsSL https://belzedar.duckdns.org/test/361/` confirmó #361 aprobado,
+  prioridad **50**, **0/100** chunks, **0/10.000.000** posiciones y **0**
+  intentos en todos los chunks. No se envió POST ni se tocó prioridad.
+- Para el kernel SIMD, el extremo de cada suma adyacente es
+  **[-32.512, 32.258]**, dentro de int16. La sonda corregida con seed 20260829
+  comparó **20.000** vectores aleatorios de 32 entradas: **0** discrepancias
+  entre producto escalar y agrupación `maddubs`.
+
+**Autopsias propias**:
+
+1. Un inventario de procesos pidió `CommandLine` completa y expuso en la salida
+   interactiva una credencial del worker. El secreto no se copió a ningún
+   fichero ni commit, pero el transcript ya no es apto para compartir sin
+   redacción y la credencial debe rotarse. Regla derivada: inventariar PID,
+   parent y nombre por defecto; línea de comando solo con redacción explícita.
+2. `clang-format -i` se lanzó sin existir `.clang-format` y produjo un diff
+   mecánico de **692 líneas**. Se verificó que el destino era el worktree
+   creado por este agente y la rama exacta, se retiró solo ese scratch y se
+   recreó desde `5226966`; el diff lógico volvió a **108 inserciones**. Regla:
+   no ejecutar el formateador global sin estilo pineado; formatear hunks a mano.
+3. La primera sonda aritmética terminó en `SyntaxError` por una expresión de
+   asignación inválida dentro de una comprensión. Se contó como fallo de sonda,
+   se corrigió el comando y solo la segunda ejecución aporta evidencia.
+
+**Decisión**: **NO TEST / NO COMMIT** para las cuatro ramas hasta que el recurso
+gate abra. En ese hueco, P1 desarrollo se repite primero; después se validan
+estas ramas una por una. La validación oficial del runner/libro sigue siendo
+prerrequisito de cualquier SPRT y P1 conserva la primera posición. #361 queda
+esperando sin elevar su prioridad.
+
+**Learnings**: una optimización matemáticamente exacta sigue necesitando paridad
+del binario real; un ahorro NCF de arranque no es Elo; un diff aislado no es una
+admisión a granja; y los diagnósticos también deben aplicar minimización de
+secretos y contratos de formato reproducibles.
