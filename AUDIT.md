@@ -1370,3 +1370,65 @@ esperando sin elevar su prioridad.
 del binario real; un ahorro NCF de arranque no es Elo; un diff aislado no es una
 admisión a granja; y los diagnósticos también deben aplicar minimización de
 secretos y contratos de formato reproducibles.
+
+---
+
+## 2026-08-29 — Predeclaración del smoke oficial de reloj: **VALIDATION_ONLY LISTO / NO ENVIADO**
+
+**Hipótesis**: antes del primer SPRT Terachess, el camino real
+servidor→worker→runner debe demostrar que carga net-2 y el libro autenticado,
+envía `wtime/btime/winc/binc`, respeta el cap de 1.200 plies y conserva PGN
+suficiente para medir tiempos. Una partida `GAMES` contra los mismos bytes es
+un smoke operativo, no una comparación de fuerza.
+
+**Estado e identidades verificados a las 09:27:27,987 UTC**:
+
+- `belzedar.duckdns.org` respondió HTTP 200 y resolvió a `167.233.35.111`.
+  El SSH documentado no aceptó la clave disponible (`Permission denied`), por
+  lo que no se infirió el checkout de producción desde una copia local.
+- La página oficial `/newTest/`, en sesión autenticada del propietario, lista
+  `Terachess-Stockfish`, `TERACHESS_openings_v1.epd` y net-2. Las máquinas 9 y
+  11 declaran Client **49**, T24 Windows/g++ 16.1.0 y T32 Linux/g++ 16.2.1.
+- El pin v49 es `client_repo_ref=77b05ecd9c3d77a7934cab4d4406f103241daf4b`;
+  ese árbol enruta `TERACHESS` a `uci_pair_runner.py` con variante `terachess`
+  y añade literalmente `--max-plies 1200`.
+- Ambos workers estaban en #407, prioridad **400**. Delante de Terachess siguen
+  #396 Spell DATAGEN, prioridad **311**, y los SPRT Spell (por ejemplo #380,
+  prioridad **304**). #361 permanece aprobado a prioridad **50**, 0/100 chunks
+  y 0/10.000.000 posiciones. No se modificó ninguna fila ni prioridad.
+
+**Contrato congelado antes del resultado**:
+
+| Campo | Valor |
+|---|---|
+| modo | `GAMES`; etiqueta metodológica `VALIDATION_ONLY`; ninguna inferencia Elo |
+| dev/base | `Terachess-Stockfish` @ `711177d601f5e16341277e81a141c63d0e61ef52` |
+| bench | `32541` en ambos lados |
+| red | `tera-net2.tnn`, SHA-256 `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`, 56.858.966 B |
+| libro | `TERACHESS_openings_v1.epd`, SHA-256 de texto/raw `1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7` |
+| TC/opciones | `60.0+0.6`; `Threads=1 Hash=16` en ambos lados |
+| adjudicación | Syzygy WDL/ADJ `DISABLED`; win `movecount=6 score=5000`; draw `None` |
+| evidencia | `upload_pgns=VERBOSE`, `workload_size=1`, `test_max_games=2` |
+| cola | prioridad **50**, throughput **1000**; no se toca #361 ni cargas ajenas |
+
+`test_max_games=2` pide un par con colores invertidos. OpenBench puede arrancar
+más pares concurrentes antes del primer reporte; cualquier exceso se registra,
+no se recorta ni se usa para cambiar el gate.
+
+**Gate falsable**: PASS solo si ambos builds reproducen 32.541; hay al menos un
+par completo y PGN verbose; cada PGN declara `Variant=terachess`, el FEN existe
+en el libro registrado y termina antes de 1.200 plies sin crash, ilegal,
+stall, time loss ni falsa tabla por cap. De los comentarios se publicarán por
+máquina N, p50/p95/p99/máximo de ms por jugada y un límite inferior conservador
+del reloj restante: `60.000 + 600*n - sum(floor(ms)) - n`; debe ser positivo
+para ambos colores. El WDL y el `passed/failed` decorativo de un `GAMES`
+self-play se ignoran por completo. Cualquier ausencia de PGN, identidad, ruta
+de variante o timing es **FAIL cerrado** y se diagnostica antes de un SPRT.
+
+**Decisión**: contrato listo, pero el formulario aún no se envió. P1 continúa
+siendo el primer test de fuerza y este smoke no consume ninguno de sus seis
+slots SPRT.
+
+**Error de sellado**: el primer guard pre-commit trató la salida escalar de
+`git diff --name-only` como si ya fuera un array y abortó antes de `git add`.
+No hubo staging ni cambio externo; se corrigió envolviendo la captura en `@()`.
