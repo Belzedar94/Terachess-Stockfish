@@ -20,6 +20,9 @@ profile-build está prohibido en esta máquina hasta que se demuestre lo contrar
 | 2026-07-19 | 3ce4612 | `bench 16 1 5` sin red | **21.519** | — | net-1 disponible; sin red la firma no cambia (la integración NNUE no altera el árbol material) |
 | 2026-08-12 | bootstrap OpenBench (base `2b255e0`) | `bench` ×4, build público con net-2 | **32.541** | 94.595–139.660 | GCC 16.1, `ARCH=native`→`x86-64-bmi2`, worker T24 concurrente; material `bench` ×4 conservó **21.519** |
 | 2026-08-12 | identidad DATAGEN v41 (base `e8f2e7e`) | `bench` ×4, build público con net-2 | **32.541** | 81.556–123.261 | SHA-256 se calcula sobre el stream cargado; material forzado: **21.519** ×4 (130.418–173.540 NPS) |
+| 2026-08-29 | `f26d8b0` (baseline P1) | `make -j1 build ARCH=x86-64-bmi2 COMP=mingw`; `bench 16 1 5` ×4 con net-2 | **32.541** | 295.827–306.990 | GCC 16.1, sin PGO; firma idéntica a la referencia pública y NPS-check sin regresión bajo una carga Crazyhouse ajena |
+| 2026-08-29 | `ab7a8ed` (`codex/lmp-d4`) | archive limpio; `make -j1 build ARCH=x86-64-bmi2 COMP=mingw`; `bench 16 1 5` ×4 | **96.916** | 369.908–383.067 | `TERA_SOURCE_DIRTY=0`; SHA-256 binario `36c5bd4ef0859c832f49e3e224f7977e463fb9fdc729438a6ebb020adf7fe8d5`; árbol distinto esperado por D4 |
+| 2026-08-29 | `763144e` (`codex/lmp-u34`) | archive limpio; `make -j1 build ARCH=x86-64-bmi2 COMP=mingw`; `bench 16 1 5` ×4 | **27.855** | 320.172–339.695 | `TERA_SOURCE_DIRTY=0`; SHA-256 binario `3b500e797f0901c3242d6bfc7f17f03f77e651a4efdafc7c27793713d152b60c`; árbol distinto esperado por U3/4 |
 
 ## Otras mediciones de referencia (mismo commit 94fab4f)
 

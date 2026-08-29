@@ -1793,3 +1793,137 @@ OpenBench y cada workload nuevo conservará prioridad **400** y bounds `[1,6]`.
 traza reproducible sin recibo sigue siendo inválida; validar una optimización
 de herramienta exige reproducir un resultado conocido byte a byte; y una
 restricción de memoria se corrige con memoria acotada, nunca relajando el gate.
+
+---
+
+## 2026-08-29 — P1 LMP, holdout: **PASS**; D4/U3/4 a OpenBench #411/#412; U2 **REJECT**
+
+**Hipótesis**: el holdout congelado debía decidir, sin mirar partidas, cuáles
+de U2, D4 y U3/4 eran puntos no dominados. Solo esos puntos podían consumir un
+SPRT de la familia P1. El propietario ordenó mantener apagado el worker local,
+usar el worker externo y crear por CLI cualquier workload nuevo con prioridad
+**400**, conservando antes el workload Spell ya asignado.
+
+**Recurso, identidad y orden de cola**:
+
+- Se conservaron motor de traza SHA-256
+  `50342abe5011bc4d3b76e49f3c6f2bd94bb9486012846410701e0f11d222bb3c`,
+  net-2 `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`
+  y raíces holdout
+  `099d9eec8ef58f8608cefca4f7011546e8211de6e6b5b02f461741807fd0c661`.
+  Los artefactos están en
+  `D:\Terachess-artifacts\p1-holdout-20260829-f26d8b0`.
+- Antes de publicar, producción mostraba Spell #396, DATAGEN, prioridad
+  **311**, **108.250.000** partidas y asignado a las máquinas 11/18; el último
+  heartbeat de la 18 era `2026-08-29 17:42:50 UTC`. También existían Crazyhouse
+  #409/#410 a prioridad 400. No se cambió prioridad, estado ni asignación de
+  ninguno. Después de crear P1, #396 seguía abierto, sin error y a prioridad
+  311 con la máquina 18 aún asignada.
+- El DATAGEN Terachess #361 se leyó antes y después de la transacción: prioridad
+  **50**, 0 partidas, abierto y sin error. No se modificó.
+- `D:\OpenBench-workers\opportunistic-t8-20260719-launch2\Client\openbench.exit`
+  quedó presente y vacío. La sonda final, filtrada por ejecutables cliente y
+  motor y excluyendo su propio PID, contó **0** procesos. No se reactivó el
+  worker local ni se tocó la carga Crazyhouse ajena.
+
+**Holdout baseline**:
+
+- Las repeticiones A/B produjeron **23.987** registros, 128/128 raíces y
+  trazas byte-idénticas, SHA-256
+  `5540e43bb008e3015a5a769337b6ffd295ca79cae81c2fbca48cdfec60db91c8`.
+  Los seis estratos fueron **4.000/4.000/4.000/3.996/3.998/3.993**; hubo
+  512/512 sondas de oráculo, 0 errores estructurales y contrato congelado
+  completo.
+- El frente Pareto fue `baseline,D4,k3,k4,legal-half,no-LMP`. D4 retuvo
+  **818.637/3.262.198** movimientos, **1.004/3.445** críticos y añadió trabajo
+  firmado `+0,006044516` sobre nodos primarios: queda **admitido**.
+- U2 retuvo **889.141/3.262.198**, **1.551/3.445** críticos y añadió
+  `+0,054609632`; `legal-half` consiguió a la vez más recall crítico
+  (**2.009/3.445**) y menos trabajo (`+0,033066026`). U2 es dominado y queda
+  **RECHAZADO antes de partidas**. Sus rungs STC/LTC se retiran y no se
+  sustituyen después de ver el resultado.
+
+**Holdout U3/4 y validación de la sonda sospechosa**:
+
+- Las repeticiones A/B produjeron **23.994** registros, **23.644** expuestos,
+  128/128 raíces y trazas byte-idénticas, SHA-256
+  `8e5b0cf9a870fe4df04aab3ae1f3bec1930f14e9a98f6165c0ad94c5df0b65c3`.
+  Estratos: **3.992/3.939/3.994/3.912/3.978/3.829**; 512/512 oráculos, 0
+  errores y contrato completo. El frente Pareto fue `baseline,U3/4`.
+- U3/4 retuvo **0/3.500.335** movimientos y **0/3.440** críticos, con trabajo
+  firmado `-0,026329365`. Por ser un resultado demasiado limpio, no se aceptó
+  sin una segunda medición.
+- La primera sonda independiente fue incorrecta: un `rg` ingenuo buscó
+  cualquier `pruned_by_rest=false`, aunque el trace evalúa deliberadamente la
+  cola shadow para etiquetarla. Queda excluida. La repetición correcta hizo
+  streaming de **23.994** registros y **3.500.335** tail moves: mínimo
+  `rank-probe_trigger=1`, **0** en/antes del trigger, **540.718** labels shadow
+  buscados y **0/3.440** críticos en/antes del trigger. Confirma la semántica
+  causal sin reinterpretar la matriz. U3/4 queda **admitido**.
+
+**Builds, benches y gates locales**:
+
+- El primer `make -j build ARCH=x86-64-bmi2 COMP=mingw` fue un error propio:
+  con unos **7,2 GiB** libres abrió compiladores MinGW sin límite y terminó en
+  OOM antes del link. No se promovió ningún binario. Se repitieron todos los
+  builds con `-j1`, sin PGO, preservando el DATAGEN Crazyhouse concurrente.
+- Baseline `f26d8b0` reprodujo **32.541 ×4**, 295.827--306.990 NPS. D4 se
+  publicó como `ab7a8edcb0b891ae88af778a6842f3bd4d8ecff4`, bench **96.916 ×4**;
+  U3/4 como `763144ed80203a14453ec8767c494d7f21dadd5e`, bench **27.855 ×4**.
+  Ambos commits llevan su `Bench:` y las refs remotas coinciden exactamente.
+- Los archives GitHub devolvieron HTTP 200: D4 **815.488 B** y U3/4
+  **815.495 B**. Los builds limpios desde esos archives declararon
+  `TERA_SOURCE_DIRTY=0`; binarios SHA-256 D4
+  `36c5bd4ef0859c832f49e3e224f7977e463fb9fdc729438a6ebb020adf7fe8d5`
+  y U3/4
+  `3b500e797f0901c3242d6bfc7f17f03f77e651a4efdafc7c27793713d152b60c`.
+- Cada candidato pasó fixtures **87/0**, `engine_check` con **0** fallos,
+  perft inicial **54/2.916/175.508**, paridad estratificada **300** posiciones,
+  buckets 0--7, **0 cp** y 0 discrepancias, y unidades NNUE **150/150** con
+  pendiente ~**1,044** y correlación ~**0,991**.
+- En el cierre, dos intentos de bench no cuentan: el primero ejecutó el
+  artefacto baseline desde el cwd del repo y el loader rechazó
+  `../Networks/tera-net2.tnn`; el segundo supuso erróneamente que el repo tenía
+  `Networks/` y volvió a fallar antes de aceptar `setoption`. `rg --files`
+  localizó la red canónica en `nets/` y mostró que el archive limpio D4 sí
+  contenía la estructura esperada. Ejecutar el mismo baseline desde el `src/`
+  de ese archive, tras comprobar SHA-256 exacto de net-2, dio **32.541** nodos
+  y **301.305 NPS**. Regla: cwd y layout son inputs del loader; un `setoption`
+  posterior no rescata un binario que cierra durante la carga inicial.
+
+**OpenBench oficial por CLI**:
+
+- Una única transacción `manage.py shell` verificó el smoke #408, baseline
+  `711177d601f5e16341277e81a141c63d0e61ef52` bench **32.541**, red
+  `05162B61` (`tera-net2.tnn`), libro `TERACHESS_openings_v1.epd`, TC
+  `60.0+0.60`, `Threads=1 Hash=16`, Syzygy deshabilitado y adjudicación
+  `movecount=6 score=5000` / `None`. Reinició libro a índice 1 y todos los
+  contadores/flags; si cualquier precondición fallaba, no se creaba ninguno.
+- D4 quedó en `https://belzedar.duckdns.org/test/411/` y U3/4 en
+  `https://belzedar.duckdns.org/test/412/`. Ambas páginas devolvieron HTTP 200
+  y contienen el nombre esperado. Lectura independiente de DB: SPRT
+  pentanomial, bounds Elo **[1,6]**, alpha=beta=**0,05**, LLR
+  **[-2,944438979; 0; +2,944438979]**, TC **60+0,60**, workload 1,
+  throughput 1.000, prioridad **400**, red net-2 en ambos lados, aprobados,
+  0 partidas, 0 resultados y sin error. Los dos eventos son
+  `CREATE P=400 TP=1000`.
+- Se escribió `max_games=5000` en ambas filas. Autopsia de infraestructura:
+  `OpenBench.utils.update_test` solo usa `max_games` para GAMES/DATAGEN; en
+  SPRT termina exclusivamente al cruzar un bound LLR. Por tanto **5.000 es un
+  control operativo, no un hard stop del servidor actual**: si una prueba
+  alcanza 5.000 sin H0/H1 debe detenerse fail-closed antes de aceptar más
+  resultados. No se parcheó producción, que está sucia y fuera del alcance de
+  esta familia.
+
+**Decisión**: holdout P1 **PASS** para D4 y U3/4; U2 **REJECT**. Se activaron
+**2/6 SPRT** presupuestados. Los dos rungs U2 quedan retirados; solo podrán
+añadirse hasta dos LTC correspondientes si cada STC cruza H1. No hay claim de
+Elo, merge ni promoción mientras #411/#412 no terminen y sus resultados por
+máquina no pasen auditoría.
+
+**Learnings**: el frente Pareto es un gate, no un ranking que permita rescatar
+U2; un cero exacto exige una sonda causal independiente; `make -j` sin número
+no es seguro bajo carga compartida; una sonda de procesos que contiene la ruta
+buscada se cuenta a sí misma si no excluye su PID; y un campo llamado
+`max_games` no es un límite real hasta verificar el código que decide
+`finished`.
