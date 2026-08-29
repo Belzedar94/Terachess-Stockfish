@@ -1676,3 +1676,6 @@ Credential Manager no pudo cargar `System.Net.Http` con HRESULT `0x800705AF`
 (`paging file is too small`). No hubo push parcial ni cambio remoto. Se prohíbe
 reintentar en bucle bajo los 48 motores; `main` queda un commit por delante
 hasta que el lote libere memoria y permita un único reintento comprobado.
+El reintento único evitó el componente fallido usando GitHub CLI ya autenticado
+como helper efímero solo para ese comando; no cambió configuración ni expuso el
+token. Push **PASS**: `HEAD == origin/main == 1070de396de583d0d68c9e3ea2e8ce01e7c3f3c7`.
