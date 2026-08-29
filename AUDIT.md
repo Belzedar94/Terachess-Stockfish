@@ -1462,3 +1462,129 @@ SPRT de P1.
 
 **Learning**: toda corrección operativa posterior al congelado se registra como
 enmienda aditiva; nunca se reescribe el contrato histórico después de verlo.
+
+---
+
+## 2026-08-29 — OpenBench #408, smoke oficial de reloj: **PASS**; publicación PGN: **FAIL**
+
+**Hipótesis**: el camino oficial servidor→cliente v49→runner Terachess debe
+reproducir bench/red/libro, jugar al menos un par con reloj real, conservar
+comentarios verbose y terminar legalmente antes de 1.200 plies. Es una prueba
+`VALIDATION_ONLY`: el WDL entre los mismos bytes no mide fuerza.
+
+**Cambios y envío**:
+
+- La enmienda de prioridad quedó firmada y publicada en `8785e2e` (`Bench:
+  32541`). Se usó prioridad **400** como ordenó el propietario; #361 siguió en
+  **50**, sin modificación.
+- Se confirmó acceso SSH administrativo con la clave específica ya configurada
+  y el host/IP conocido `167.233.35.111`. No se reutilizó la credencial del
+  worker ni se extrajo ninguna contraseña. El checkout de producción estaba
+  `behind 61` y con cambios locales; se trató como solo lectura: ningún deploy,
+  restart, edición, cambio de threads ni cambio de worker.
+- Antes del alta, `verify_workload(request, "TEST")` devolvió **0 errores** y
+  resolvió ambos lados al commit
+  `711177d601f5e16341277e81a141c63d0e61ef52`, árbol GitHub
+  `0d510e5a809989f8f0edeb3fcad16e4736161d9e`, bench **32.541** y artefactos
+  disponibles. El alta se ejecutó por CLI dentro de una transacción con guard
+  anti-duplicado y comprobaciones post-create; creó exactamente **#408** a las
+  **10:08:20,684761 UTC**, aprobado, `awaiting=false` y prioridad **400**.
+- Se añadió `tools/audit_openbench_pgn.py`, auditor fail-closed reutilizable de
+  PGN verbose con autenticación de libro, detección de pares tras overshoot,
+  bounds de reloj y replay opcional por ambos oráculos. El recibo compacto queda
+  en `evidence/openbench_408_clock_smoke.json`.
+
+**Identidad observada en producción**: la vista pública `/test/408/` respondió
+HTTP **200** y mostró dev/base iguales, bench **32.541**, net-2, libro
+`TERACHESS_openings_v1.epd`, `Threads=1 Hash=16`, TC canónica `60.0+0.60`, PGN
+`VERBOSE`, Syzygy desactivado, win `movecount=6 score=5000` y draw `None`. El
+cliente v49 enruta por los tokens `TERACHESS` del libro/motor a
+`uci_pair_runner.py -variant terachess --max-plies 1200`; el campo DB
+`variant_contract` vacío es el comportamiento esperado de este contrato
+inferido y no una caída a ajedrez estándar.
+
+**Resultado oficial**:
+
+- Torom, máquina **11**, Linux, g++ **16.2.1**, cliente **49**, reportó a las
+  **10:13:22,376439 UTC** un par: **2** partidas, W/D/L dev **0/0/2**, penta
+  `[1,0,0,0,0]`, **0 crashes** y **0 time losses**. OpenBench marcó `failed`
+  porque wins < losses; se ignora por contrato predeclarado, no se reinterpreta
+  como fuerza. La máquina 9 llegó a reclamar trabajo, produjo **0** partidas y
+  volvió a su carga anterior sin intervención.
+- La concurrencia 32 arrancó runners antes del primer reporte: el blob de Torom
+  contiene **33** partidas terminadas, de las que el servidor contó solo el par.
+  Hay exactamente **1** par completo: juegos 5/32, Round 27, misma FEN SHA-256
+  `6c9baa2ff14d3de70147fbedf5f0af050aeca30777417a24c3ca94d222f289d4`,
+  colores dev/base invertidos, resultados `0-1`/`1-0` y **459/284 plies**.
+- El BZip2 válido mide **184.304 B**, SHA-256
+  `85b740f0a060595c74c95beb7868f58501f2fe48247aa44844f7b2349cfb850f`;
+  descomprimido mide **638.012 B**, SHA-256
+  `e0cd3c67a20c1073ee2accb585978744b53dd7565aae13d926346a45dfdda0de`.
+  El blob del result vacío de máquina 9 mide **14 B**, SHA-256
+  `d3dda84eb03b9738d118eb2be78e246106900493c0ae07819ad60815134a8058`.
+
+**Gate de PGN/reloj** — comando reproducible:
+
+```text
+python tools/audit_openbench_pgn.py --pgn .scratch/ob408-evidence/408.532.1.pgn --book books/tera_openings_v1.epd --variant terachess --canonical-tc 60.0+0.6 --max-plies 1200 --min-complete-pairs 1 --replay-oracles --allow-mate-adjudication --output .scratch/ob408-evidence/generic_audit.json
+```
+
+- **33/33** FEN están en el libro autenticado de **5.000** posiciones, SHA-256
+  `1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7`;
+  **33/33** declaran `Variant=terachess`, resultado header/trailer idéntico y
+  comentarios verbose sin `unknown` ni malformados.
+- Máximo **953 plies**, por debajo de 1.200. El replay final reproducible tardó
+  **126,000 s**: **20.737/20.737** jugadas legales, **20.737** comparaciones de
+  conjunto legal A/B, **0** ilegales y **0** divergencias. Hubo **26** finales
+  terminales confirmados por ambos oráculos y **7** finales no terminales por la
+  win-adjudication declarada, todos con secuencia final de mate. El par contado
+  aporta **743/743** plies legales y dos mates/resultados exactos.
+- La TC realmente escalada por Torom fue `21.43+0.21`, factor
+  `0.3571651798706196`. Sobre las **20.737** muestras: p50/p95/p99/máximo por
+  jugada **211/531/2.499/5.851 ms**; límite inferior mínimo del reloj canónico
+  congelado **94.486 ms** y, como comprobación adicional más estricta sobre la
+  cabecera escalada, **437 ms**. En el par: N **743**,
+  **214/1.003/3.111/5.851 ms**, mínimos **94.486/536 ms**. Todos son positivos.
+- Client v49 elimina `Termination` y `PlyCount` al compactar incluso en
+  `VERBOSE`; por ello hay **0** headers `Termination`. No se fingió esa evidencia:
+  los contadores servidor (0 crash/0 time loss), las 20.737 jugadas y los dos
+  oráculos sustituyen esa señal perdida con evidencia más fuerte.
+
+**Fallo operativo separado — agregador PGN público**: `/api/pgns/408/` devolvió
+un JSON de **55 B**, SHA-256
+`549b48fa2c362841731a04a832b8285b03ba67451bc5073660be18e1aa81d0f7`,
+“Unable to find PGN”. No faltaba el upload: DB contiene PGN 228/229 con
+`processed=false` y los dos blobs raw existen. Producción usa Gunicorn y no hay
+servicio `PGNWatcher`; este watcher solo se arranca desde el `runserver` local.
+No se arrancó manualmente: habría procesado y borrado el backlog global. Queda
+**FAIL** la publicación por API, no el PGN raw ni el smoke del runner.
+
+**Autopsias propias**:
+
+1. La primera sonda importó `verify_workload` antes de `OpenBench.views` y chocó
+   con el ciclo de imports; terminó antes de consultar o mutar. Se corrigió el
+   orden y solo el segundo resultado (**0 errores**) cuenta.
+2. El primer intento transaccional de alta esperaba TC almacenada `60.0+0.6` y
+   `variant_contract=terachess`; OpenBench normaliza a `60.0+0.60` y persiste el
+   contrato inferido como vacío. El guard vio **0** filas coincidentes y lanzó
+   rollback: `max(id)` quedó en **407**. Una transacción de observación también
+   se forzó a rollback, reveló los valores exactos y el alta corregida creó solo
+   #408. Regla: el guard idempotente compara representación persistida, validada
+   en rollback, no la representación del formulario.
+3. La primera descarga confió en la extensión `.tar`; `tar` rechazó el fichero.
+   Se midieron sus **55 B**, se leyó el JSON y se diagnosticaron DB/files antes
+   de reintentar. Regla: validar tipo, tamaño y hash de toda descarga antes de
+   tratar su nombre como evidencia de formato.
+
+**Decisión**: smoke oficial de runner/reloj **PASS**; fuerza **NO MEDIDA**;
+publicación agregada de PGN **FAIL** y deuda OpenBench separada. P1 queda
+desbloqueada por este prerrequisito, mantiene su presupuesto de seis SPRT y su
+orden experimental. #361 sigue aprobado, 0/10.000.000 y prioridad 50 salvo
+avance posterior de workers; esta prueba no cambió su configuración.
+
+**Learnings**: un flag visual `failed` no sustituye el gate; una API rota no
+implica pérdida del upload si DB+bytes demuestran lo contrario; la concurrencia
+convierte `max_games=2` en **33 PGN** aunque solo contabilice dos, por lo que el
+par debe identificarse por FEN+colores; y el bound sobre la TC escalada (**437
+ms**) es la comprobación de reloj real más exigente, mientras el bound canónico
+se conserva exactamente como fue predeclarado.

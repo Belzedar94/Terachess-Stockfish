@@ -1,0 +1,157 @@
+{
+  "schema": "terachess-openbench-clock-smoke-v1",
+  "workload": {
+    "id": 408,
+    "url": "https://belzedar.duckdns.org/test/408/",
+    "created_utc": "2026-08-29T10:08:20.684761Z",
+    "created_via": "command-line Django create_workload transaction over SSH",
+    "author": "belzedar",
+    "mode": "GAMES",
+    "methodology": "VALIDATION_ONLY",
+    "priority": 400,
+    "throughput": 1000,
+    "workload_size": 1,
+    "max_games": 2,
+    "approved": true,
+    "awaiting": false,
+    "finished": true,
+    "openbench_passed_flag": false,
+    "openbench_failed_flag": true,
+    "strength_inference": "NONE"
+  },
+  "identity": {
+    "engine": "Terachess-Stockfish",
+    "dev_commit": "711177d601f5e16341277e81a141c63d0e61ef52",
+    "base_commit": "711177d601f5e16341277e81a141c63d0e61ef52",
+    "github_tree_archive": "0d510e5a809989f8f0edeb3fcad16e4736161d9e",
+    "dev_bench": 32541,
+    "base_bench": 32541,
+    "network_name": "tera-net2.tnn",
+    "network_sha256": "05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861",
+    "network_bytes": 56858966,
+    "book_name": "TERACHESS_openings_v1.epd",
+    "book_sha256": "1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7",
+    "book_bytes": 911542,
+    "book_positions": 5000,
+    "dev_options": "Threads=1 Hash=16",
+    "base_options": "Threads=1 Hash=16",
+    "requested_time_control": "60.0+0.60",
+    "syzygy_wdl": "DISABLED",
+    "syzygy_adjudication": "DISABLED",
+    "win_adjudication": "movecount=6 score=5000",
+    "draw_adjudication": "None",
+    "upload_pgns": "VERBOSE",
+    "client_version": 49,
+    "client_repo_ref": "77b05ecd9c3d77a7934cab4d4406f103241daf4b",
+    "runner": "uci_pair_runner.py",
+    "runner_variant": "terachess",
+    "runner_max_plies": 1200
+  },
+  "server_result": {
+    "games": 2,
+    "wins": 0,
+    "draws": 0,
+    "losses": 2,
+    "pentanomial": [1, 0, 0, 0, 0],
+    "crashes": 0,
+    "time_losses": 0,
+    "result_id": 532,
+    "machine_id": 11,
+    "machine_user": "Torom",
+    "machine_os": "Linux",
+    "machine_compiler": "g++ 16.2.1",
+    "machine_concurrency": 32,
+    "result_updated_utc": "2026-08-29T10:13:22.376439Z",
+    "ignored_reason": "The WDL flag is decorative for byte-identical validation self-play and was predeclared as non-evidence."
+  },
+  "artifacts": {
+    "result_532_bz2": {
+      "server_path": "Media/408.532.1.pgn.bz2",
+      "bytes": 184304,
+      "sha256": "85b740f0a060595c74c95beb7868f58501f2fe48247aa44844f7b2349cfb850f"
+    },
+    "result_532_pgn": {
+      "bytes": 638012,
+      "sha256": "e0cd3c67a20c1073ee2accb585978744b53dd7565aae13d926346a45dfdda0de"
+    },
+    "result_533_empty_bz2": {
+      "server_path": "Media/408.533.33.pgn.bz2",
+      "bytes": 14,
+      "sha256": "d3dda84eb03b9738d118eb2be78e246106900493c0ae07819ad60815134a8058",
+      "machine_id": 9,
+      "games": 0
+    },
+    "audit_report": {
+      "local_path": ".scratch/ob408-evidence/generic_audit.json",
+      "bytes": 6192,
+      "sha256": "c541b87fafa2e208d083a356be067f77f57803eebbe8f560c622c9a1efbccf37"
+    }
+  },
+  "pgn_audit": {
+    "command": "python tools/audit_openbench_pgn.py --pgn .scratch/ob408-evidence/408.532.1.pgn --book books/tera_openings_v1.epd --variant terachess --canonical-tc 60.0+0.6 --max-plies 1200 --min-complete-pairs 1 --replay-oracles --allow-mate-adjudication --output .scratch/ob408-evidence/generic_audit.json",
+    "pass": true,
+    "uploaded_games": 33,
+    "server_counted_games": 2,
+    "complete_color_swapped_pairs": 1,
+    "complete_pair_game_indexes": [5, 32],
+    "complete_pair_round": "27",
+    "complete_pair_opening_fen_sha256": "6c9baa2ff14d3de70147fbedf5f0af050aeca30777417a24c3ca94d222f289d4",
+    "complete_pair_plies": [459, 284],
+    "max_observed_plies": 953,
+    "all_fens_in_book": true,
+    "all_variants_terachess": true,
+    "all_results_match": true,
+    "all_comments_verbose": true,
+    "malformed_comments": 0,
+    "scaled_time_control": "21.43+0.21",
+    "scale_factor": "0.3571651798706196",
+    "all_games_clock": {
+      "samples": 20737,
+      "p50_ms_nearest_rank": 211,
+      "p95_ms_nearest_rank": 531,
+      "p99_ms_nearest_rank": 2499,
+      "max_ms": 5851,
+      "min_canonical_lower_bound_ms": 94486,
+      "min_scaled_header_lower_bound_ms": 437
+    },
+    "complete_pair_clock": {
+      "samples": 743,
+      "p50_ms_nearest_rank": 214,
+      "p95_ms_nearest_rank": 1003,
+      "p99_ms_nearest_rank": 3111,
+      "max_ms": 5851,
+      "min_canonical_lower_bound_ms": 94486,
+      "min_scaled_header_lower_bound_ms": 536
+    },
+    "oracle_replay": {
+      "move_checks": 20737,
+      "legal_set_checks": 20737,
+      "illegal_moves": 0,
+      "oracle_mismatches": 0,
+      "terminal_games": 26,
+      "win_adjudicated_nonterminal_games": 7,
+      "elapsed_seconds": 126.0
+    },
+    "termination_headers": 0,
+    "termination_header_note": "Client v49 pgn_util strips Termination and PlyCount. Zero server crash/time-loss counters plus full two-oracle replay establish the outcomes; seven nonterminal endings carry mate-score win-adjudication evidence."
+  },
+  "public_pgn_archive_pipeline": {
+    "status": "FAIL",
+    "api_url": "https://belzedar.duckdns.org/api/pgns/408/",
+    "api_response_bytes": 55,
+    "api_response_sha256": "549b48fa2c362841731a04a832b8285b03ba67451bc5073660be18e1aa81d0f7",
+    "api_error": "Unable to find PGN for Workload #408",
+    "database_rows": [228, 229],
+    "processed": false,
+    "root_cause": "Production runs Gunicorn without PGNWatcher; raw uploads are preserved but the public tar is not assembled.",
+    "action": "No watcher was started and no server file was changed because doing so would process and delete the global pending-PGN backlog."
+  },
+  "decision": {
+    "official_runner_clock_smoke": "PASS",
+    "public_pgn_archive_pipeline": "FAIL",
+    "strength_result": "NONE",
+    "p1_unblocked": true,
+    "datagen_361_priority": 50,
+    "datagen_361_modified": false
+  }
+}

@@ -101,3 +101,19 @@ autopsias está en [AUDIT.md](AUDIT.md).
   debajo del 5 % que exige el contrato. Desviación declarada, pendiente para la
   siguiente arquitectura.
 - **OpenBench**: preset y runbook escritos, sin instalar en el servidor.
+
+## Continuación post-v1 (2026-08-29)
+
+- **OpenBench oficial activo**: la situación anterior corresponde al corte de
+  v1.0. Terachess está desplegado en `belzedar.duckdns.org`; la campaña net-2
+  de **10.000.000** posiciones es #361, aprobada, prioridad 50 y todavía 0/100
+  chunks a las 10:31 UTC.
+- **Reloj real validado**: #408 (`VALIDATION_ONLY`, prioridad 400) pasó el gate
+  servidor→cliente v49→runner. El par oficial y las 33 partidas producidas
+  quedaron por debajo de 1.200 plies; replay A/B de **20.737** jugadas dio 0
+  ilegales/0 divergencias. El bound mínimo sobre la TC realmente escalada fue
+  **437 ms**. Evidencia: `evidence/openbench_408_clock_smoke.json`.
+- **Deuda OpenBench descubierta**: los uploads PGN raw existen, pero Gunicorn
+  no ejecuta `PGNWatcher`; `/api/pgns/408/` no construyó el tar público. El
+  smoke de runner/reloj es PASS, la publicación agregada de PGN es FAIL y no se
+  tocó el backlog global para ocultarlo.
