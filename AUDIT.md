@@ -1432,3 +1432,33 @@ slots SPRT.
 **Error de sellado**: el primer guard pre-commit trató la salida escalar de
 `git diff --name-only` como si ya fuera un array y abortó antes de `git add`.
 No hubo staging ni cambio externo; se corrigió envolviendo la captura en `@()`.
+
+---
+
+## 2026-08-29 — Enmienda de cola ordenada por el propietario: prioridad 400
+
+**Hipótesis**: la prioridad es un parámetro operativo de encolado, no parte del
+gate científico. Puede cambiarse por orden explícita sin alterar identidades,
+TC, adjudicación, tamaño, evidencia ni criterio PASS/FAIL del smoke congelado.
+
+**Cambio**: a las **10:01:20,274 UTC**, el propietario ordenó que todo workload
+nuevo enviado por este agente use prioridad **400**. Esta instrucción sustituye
+exclusivamente la fila `cola` de la predeclaración anterior para el smoke aún no
+enviado: prioridad **400**, throughput **1000**. El workload DATAGEN #361 ya
+existente permanece en prioridad **50** y no se modifica sin otra instrucción
+explícita.
+
+**Validación previa**: no se ha enviado aún ningún POST. El resto del contrato
+permanece byte por byte: mismo commit `711177d601f5e16341277e81a141c63d0e61ef52`,
+bench **32.541**, net/libro autenticados, `60.0+0.6`, `Threads=1 Hash=16`,
+adjudicación declarada, `upload_pgns=VERBOSE`, `workload_size=1` y máximo **2**
+partidas.
+
+**Decisión**: usar prioridad **400** en el próximo envío. Se acepta que ese
+valor empate la prioridad observada de #407 y supere las prioridades 311/304
+observadas de las cargas Spell; el plan científico no cambia y el smoke sigue
+siendo `VALIDATION_ONLY`, sin inferencia de fuerza ni consumo del presupuesto
+SPRT de P1.
+
+**Learning**: toda corrección operativa posterior al congelado se registra como
+enmienda aditiva; nunca se reescribe el contrato histórico después de verlo.
