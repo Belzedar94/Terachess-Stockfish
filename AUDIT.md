@@ -1658,3 +1658,21 @@ por CLI en OpenBench con prioridad **400** y los bounds ya congelados `[1,6]`.
 arnés a DATAGEN no es un simple cambio de transporte cuando se perderían dos de
 sus tres recibos; y preparar un diff no autoriza ni su commit funcional ni un
 test antes de reproducir bench, NPS y el gate causal.
+
+**Revalidación posterior (10:51:31 UTC)**: el hueco observado terminó sin que
+este agente lanzara nada. La máquina 9 pasó a OpenBench #312,
+`Horde-Stockfish test/qsearch-disable-movecount`, SPRT, prioridad **301**,
+6.168 partidas, `finished=false`, `error=false`; localmente había **48**
+procesos Horde y **6.074 MiB** disponibles. El gate de recurso continuó
+cerrado. Una sonda de presencia de `openbench.exit` falló primero por un pipe
+PowerShell sintácticamente inválido; la repetición corregida halló **0/2** flags
+en los dos checkouts conocidos. Un monitor posterior de 30 s devolvió stdout
+vacío y se descartó; la fotografía inmediata siguiente es la que aporta los
+48 procesos y el workload #312. Ninguna de esas sondas mutó el worker.
+
+**Fallo de publicación**: el commit documental se creó localmente, pero el
+primer `git push origin main` abortó antes de obtener credenciales: Git
+Credential Manager no pudo cargar `System.Net.Http` con HRESULT `0x800705AF`
+(`paging file is too small`). No hubo push parcial ni cambio remoto. Se prohíbe
+reintentar en bucle bajo los 48 motores; `main` queda un commit por delante
+hasta que el lote libere memoria y permita un único reintento comprobado.
