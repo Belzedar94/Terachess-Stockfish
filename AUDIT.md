@@ -1588,3 +1588,73 @@ convierte `max_games=2` en **33 PGN** aunque solo contabilice dos, por lo que el
 par debe identificarse por FEN+colores; y el bound sobre la TC escalada (**437
 ms**) es la comprobación de reloj real más exigente, mientras el bound canónico
 se conserva exactamente como fue predeclarado.
+
+---
+
+## 2026-08-29 — P1 LMP después del smoke: **RAMAS PREPARADAS / RECURSO CERRADO / 0 TESTS**
+
+**Hipótesis**: una vez validado el runner oficial, P1 sigue necesitando el gate
+causal offline retirado el 12 de agosto. No se puede convertir la señal de las
+127 raíces válidas en permiso de granja, ni competir con el workload Spell que
+el propietario ordenó ejecutar primero. Las tres fórmulas congeladas deben
+vivir en diffs separados y cualquier workload nuevo de este agente usará
+prioridad **400**.
+
+**Cambios preparatorios**:
+
+- Se crearon desde `999ccfd` tres worktrees y ramas locales, todavía sin commit:
+  `codex/lmp-u2`, `codex/lmp-d4` y `codex/lmp-u34`. Cada una toca solo
+  `src/search.cpp`: `U2 = 2*T0`; D4 omite LMP exactamente para `depth <= 4`; y
+  `U3/4 = max(1, floor(3*T0/4))`. `git diff --check` dio 0 errores en las tres.
+- Una comprobación exhaustiva de las expresiones para depth 1--20 y ambos
+  valores de `improving` dio **40 casos, 0 discrepancias** contra las fórmulas
+  congeladas. No se compiló, no se midió bench/NPS y no se hizo push de esas
+  ramas: por tanto siguen en estado **NO TEST**.
+- Se estudió transportar el arnés como DATAGEN de OpenBench. El cliente v49 no
+  ejecuta un comando externo: lanza el binario construido y le escribe por
+  stdin una única línea UCI; solo conserva el fichero `{OUT}`. El arnés actual
+  necesita lanzar Python, autenticar trace+transcript+receipt y dos procesos
+  independientes. Alterar motor/cliente para envolverlo sería infraestructura
+  nueva y cambiaría el experimento; se rechazó. La lectura correcta de "todos
+  los tests por OpenBench" queda: todos los benches/matches oficiales van a
+  OpenBench; el arnés causal previo sigue siendo una medición offline, como
+  exige `docs/staging-program.md`.
+
+**Gate de recurso**:
+
+- La primera fotografía local mostró **24** procesos Spell y **25** procesos
+  Python auxiliares; añadir el motor monohilo habría creado el hilo de motor 25
+  contra el límite heredado de 24. No se lanzó.
+- En una transición posterior hubo 0 motores visibles y **5.843 MiB** libres,
+  pero producción todavía ligaba la máquina 9 al workload Spell **#378**,
+  prioridad **304**, concurrencia **24**, actualizado a
+  `2026-08-29 10:45:24,877790 UTC`. Una ausencia momentánea de procesos no es
+  un lease: tampoco se lanzó ahí. No se paró, reinició ni reconfiguró el worker.
+- #361 se releyó en producción: DATAGEN, aprobado, sin error, prioridad **50**,
+  **0/10.000.000** registros y **0** chunks. No se modificó.
+
+**Autopsia propia**: la primera inspección de cuatro diffs de rendimiento abrió
+cuatro procesos PowerShell en paralelo mientras Spell ocupaba la RAM. Uno cayó
+con error CLR y tres con `OutOfMemory`/inicialización de PowerShell; no hubo
+escrituras ni procesos persistentes. La repetición secuencial, en un solo
+PowerShell, leyó los cuatro diffs. Regla derivada: bajo worker T24, paralelizar
+I/O con un solo proceso y herramientas ligeras; no multiplicar runtimes
+PowerShell aunque la tarea sea solo lectura.
+
+**Validación estática adicional**: `continuationHistory` es una referencia al
+`SharedHistories` del nodo NUMA, por lo que su limpieza redundante sí es un
+candidato real de arranque; `generate<EVASIONS>` filtra explícitamente cada
+movimiento con `legal()`, por lo que evitar la segunda validación en search es
+una hipótesis real. Ninguna de las dos observaciones es un dato de velocidad o
+fuerza y ambas conservan estado **NO TEST**.
+
+**Decisión**: **0 workloads nuevos** y **0 slots P1 consumidos**. El siguiente
+paso sigue siendo dos colecciones completas de desarrollo con la barrera final,
+128/128 raíces a >=100.000 nodos y paths distintos; solo un PASS permite abrir
+holdout. Después se compila/benchea la rama P1 admitida y su SPRT STC se crea
+por CLI en OpenBench con prioridad **400** y los bounds ya congelados `[1,6]`.
+
+**Learnings**: una transición de lote no es capacidad autorizada; llevar el
+arnés a DATAGEN no es un simple cambio de transporte cuando se perderían dos de
+sus tres recibos; y preparar un diff no autoriza ni su commit funcional ni un
+test antes de reproducir bench, NPS y el gate causal.
