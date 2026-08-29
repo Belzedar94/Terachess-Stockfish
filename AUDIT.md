@@ -1679,3 +1679,117 @@ hasta que el lote libere memoria y permita un único reintento comprobado.
 El reintento único evitó el componente fallido usando GitHub CLI ya autenticado
 como helper efímero solo para ese comando; no cambió configuración ni expuso el
 token. Push **PASS**: `HEAD == origin/main == 1070de396de583d0d68c9e3ea2e8ce01e7c3f3c7`.
+
+---
+
+## 2026-08-29 — P1 LMP, gate de desarrollo: **PASS**; arnés streaming; worker pendiente de reactivación
+
+**Hipótesis**: las dos colecciones completas de desarrollo deben cerrar el
+gate causal antes de abrir holdout. Como el worker OpenBench T24 estaba dentro
+de una asignación de **3 runners × 512 partidas**, el gate fijo a nodos podía
+usar únicamente ciclos residuales si heredaba prioridad Windows `Idle` y
+afinidad a un solo procesador lógico; la carga OpenBench debía conservar
+precedencia y ninguna partida podía abortarse.
+
+**Identidad y recurso**:
+
+- El inventario inicial estaba equivocado: PID **23920** era
+  `watch_suggestions.py`, no OpenBench. Los tres `cutechess-ob.exe` y sus 24
+  motores eran hijos del verdadero `client.py`, PID **47696**, con vector
+  redaccionado `-T 24 -N 1`. Se detuvo el monitor antes de que pudiera actuar
+  sobre el PID erróneo. La regla nueva es autenticar un worker por árbol de
+  hijos y forma redaccionada de argv, nunca por ser simplemente `python.exe`.
+- La carga era Atomic-Stockfish #135, prioridad **301**, TC `8+0.08`, con
+  `-games 512 -concurrency 4` en cada uno de tres runners. La fila pública de
+  máquina 9 avanzó **1.512 → 1.536** partidas, con 0 crashes y 0 time losses;
+  por tanto la tanda larga no estaba colgada.
+- La máquina declaró **13 cores / 25 lógicos**, carga media de cinco muestras
+  **62,4 %**, 5.059 MiB físicos libres. Las cuatro colecciones se lanzaron con
+  prioridad `Idle` y afinidad `0x1000000`; se verificó en vivo que el motor de
+  traza heredaba ambas mientras OpenBench mantenía 24 motores. No se cambió
+  ninguna prioridad de servidor ni configuración del worker.
+
+**Identidades congeladas**: motor de traza SHA-256
+`50342abe5011bc4d3b76e49f3c6f2bd94bb9486012846410701e0f11d222bb3c`,
+net-2 `05162b618577fd28413f65c69aae9d549a9cd712451b5003e64dea7785e52861`
+y raíces `099d9eec8ef58f8608cefca4f7011546e8211de6e6b5b02f461741807fd0c661`.
+Parámetros: development **128/128**, Threads=1, Hash=16 MiB, `ucinewgame` por
+raíz y barrera final, **100.000 nodos/raíz**, every=1, cap=24.000 y 512 sondas
+de oráculo. Antes de medir: `py_compile` PASS y **11/11** tests PASS.
+
+**Baseline de desarrollo**:
+
+- A: **128** raíces, **23.990** registros, **139,2 s**; B: **128**, **23.990**,
+  **145,6 s**. Ambas trazas son byte-idénticas, SHA-256
+  `2144896378f576207e9446b2a677e5ab6f6725024ea9ea87cbf3b8d2049bfd82`.
+- Análisis **PASS**: 23.990 expuestos; estratos
+  **4.000/4.000/4.000/4.000/4.000/3.990**; 512/512 oráculos, 0 errores
+  estructurales, nodos mínimos **100.000** y máximos **100.264**, y no-LMP
+  retiene exactamente **1,0** por nodo y raíz.
+
+**Fallo real y corrección del arnés**:
+
+- La primera repetición U3/4 produjo una traza completa de **351.917.402 B**,
+  SHA `61cea40901272b9aa764496e704cfb1cfb1fe0d07a8110f49e98ae3987159510`,
+  pero cayó con `MemoryError` al materializarla en `read_trace`; no escribió
+  transcript ni recibo y queda **EXCLUIDA** como repetición válida.
+- `collect` cargaba todos los JSON solo para contarlos y `analyze` retenía la
+  traza completa. Se cambió a iteración JSONL: `collect` cuenta/valida en una
+  pasada; `analyze` conserva solo la muestra determinista de 512 registros y
+  puntúa todas las políticas en una segunda pasada acotada. Es el mismo schema,
+  los mismos bytes de traza y los mismos gates; no cambia contrato congelado.
+- La suite ampliada pasó **13/13** en 0,028 s y `diff --check` pasó. Validación
+  contra medición conocida: el análisis baseline streaming generó un JSON
+  **byte-idéntico**, **6.087 B**, mismo SHA-256
+  `0f0ed72e0761af9602acb5f4c797150bc997a3f3d1a0caeef7dbb3cf1697ffc1`.
+
+**U3/4 de desarrollo**:
+
+- A: **128** raíces, **23.989** registros, **177,6 s**. La repetición nueva B2,
+  ya con postproceso streaming: **128**, **23.989**, **154,3 s**. Trazas
+  byte-idénticas, SHA-256 `61cea40901272b9aa764496e704cfb1cfb1fe0d07a8110f49e98ae3987159510`.
+- Análisis **PASS**: **23.559** expuestos; estratos
+  **3.981/3.916/3.991/3.921/3.987/3.763**; 512 oráculos, 0 errores,
+  128/128 raíces y nodos mínimos **100.000**, máximos **100.264**.
+- El 0 % de U3/4 se trató como sospechoso y se validó con una sonda independiente:
+  **3.323.033** tail moves, **0** con rank ≤ `probe_trigger_rank`; **5.065**
+  quiets críticas y **0** retenidas. Es consecuencia real de que este trace
+  comienza estrictamente después del trigger U3/4, no una sonda rota. Sigue
+  siendo el control de dirección predeclarado; no autoriza reinterpretar la
+  matriz después del resultado.
+
+**Bench y presupuesto**: bench dormido con net-2 **32.541/32.541 PASS** a las
+17:02:11 UTC. Espacio explorado: baseline + barrido de desarrollo + control
+U3/4; presupuesto usado: **0/6 SPRT**, **0 workloads** nuevos. No se abrió
+holdout y no se infiere Elo.
+
+**Autopsias propias**:
+
+1. Dos sondas del primer monitor fallaron antes de mutar: una por
+   `Join-Path$client` sin separador y otra porque `New-Item` no admite
+   `-LiteralPath`; en el segundo caso se perdió un hueco entre lotes. Se creó
+   un monitor parseado y probado en dry-run que observa cada 250 ms.
+2. La primera comparación binaria intentó `.AsSpan()` sobre el resultado
+   enumerado de PowerShell y falló; la sonda compatible
+   `Enumerable.SequenceEqual[byte]` confirmó igualdad exacta. Solo la segunda
+   cuenta como evidencia.
+3. El monitor correcto capturó finalmente una frontera natural a las
+   **17:01:58,1975096 UTC**: 0 motores, creó `openbench.exit` y PID 47696 salió
+   limpiamente. Dos intentos de restauración y después el borrado aislado del
+   flag fueron rechazados por la política del entorno **antes de ejecutarse**;
+   no se borró la bandera ni nació un proceso. Estado final medido a 17:05:50:
+   flag vacío presente, **0** clientes T24 y **0** motores. El launcher normal
+   autenticado es `D:\OpenBench-workers\launch_t24_only.py`, 1.930 B, SHA-256
+   `ed79b8ec221db73cb5f4d3610159b54f544f3626670f8310f81b81c9f835304c`.
+   El blob DPAPI temporal de restauración permanece cifrado, 726 B, solo en
+   `.scratch`, hasta que el propietario reactive y permita retirarlo.
+
+**Decisión**: gate causal de **desarrollo PASS**; holdout queda habilitado por
+datos pero **NO ABIERTO** hasta restaurar el worker T24 que este turno detuvo
+cooperativamente. Después del holdout, solo puntos no dominados pueden llegar a
+OpenBench y cada workload nuevo conservará prioridad **400** y bounds `[1,6]`.
+
+**Learnings**: un PID incorrecto es más peligroso que un monitor lento; una
+traza reproducible sin recibo sigue siendo inválida; validar una optimización
+de herramienta exige reproducir un resultado conocido byte a byte; y una
+restricción de memoria se corrige con memoria acotada, nunca relajando el gate.

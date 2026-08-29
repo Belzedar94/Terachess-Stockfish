@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import collections
 import hashlib
+import heapq
 import json
 import math
 import os
@@ -421,8 +422,7 @@ def run_search_batch(
     return completed.stdout, searches, elapsed
 
 
-def read_trace(path: Path) -> list[dict]:
-    records: list[dict] = []
+def iter_trace(path: Path):
     with path.open(encoding="utf-8") as source:
         for number, line in enumerate(source, 1):
             try:
@@ -431,15 +431,19 @@ def read_trace(path: Path) -> list[dict]:
                 raise HarnessError(f"invalid trace JSON at line {number}: {error}") from error
             if record.get("schema") != SCHEMA_TRACE:
                 raise HarnessError(f"wrong trace schema at line {number}")
-            records.append(record)
-    return records
+            yield record
+
+
+def read_trace(path: Path) -> list[dict]:
+    """Materialize a trace only for deliberately tiny control runs."""
+    return list(iter_trace(path))
 
 
 def validate_collection_contract(
     collection: object,
     collection_path: Path,
     trace_path: Path,
-    trace_records: list[dict],
+    trace_records: int | list[dict],
     roots_path: Path,
     root_fens: set[str],
     split: str,
@@ -495,10 +499,11 @@ def validate_collection_contract(
             errors.append(f"{prefix}: search.{key}={search.get(key)!r}, expected {expected!r}")
 
     trace = collection.get("trace", {})
+    trace_record_count = trace_records if isinstance(trace_records, int) else len(trace_records)
     trace_expected = {
         "sha256": sha256_file(trace_path),
         "bytes": trace_path.stat().st_size,
-        "records": len(trace_records),
+        "records": trace_record_count,
         "every": FROZEN_TRACE_EVERY,
         "max_records": FROZEN_MAX_RECORDS,
         "mode": mode,
@@ -565,10 +570,14 @@ def collect(args: argparse.Namespace) -> int:
     )
     if not trace_path.is_file():
         raise HarnessError("trace build produced no trace file")
-    trace_records = read_trace(trace_path)
-    if not trace_records:
+    trace_record_count = 0
+    stopped = False
+    for record in iter_trace(trace_path):
+        trace_record_count += 1
+        stopped = stopped or bool(record.get("stopped"))
+    if not trace_record_count:
         raise HarnessError("trace file contains zero records")
-    if any(record.get("stopped") for record in trace_records):
+    if stopped:
         raise HarnessError("trace contains a stopped/incomplete shadow replay")
 
     transcript_path.parent.mkdir(parents=True, exist_ok=True)
@@ -610,7 +619,7 @@ def collect(args: argparse.Namespace) -> int:
             "path": str(trace_path),
             "bytes": trace_path.stat().st_size,
             "sha256": sha256_file(trace_path),
-            "records": len(trace_records),
+            "records": trace_record_count,
             "every": args.every,
             "max_records": args.max_records,
             "mode": args.mode,
@@ -624,7 +633,7 @@ def collect(args: argparse.Namespace) -> int:
     }
     canonical_json(output_path, receipt)
     print(
-        f"collection PASS: {len(roots)} roots, {len(trace_records)} records, "
+        f"collection PASS: {len(roots)} roots, {trace_record_count} records, "
         f"{elapsed:.1f}s; trace SHA-256 {receipt['trace']['sha256']}"
     )
     return 0
@@ -663,77 +672,83 @@ def stable_search_projection(searches: list[dict]) -> list[dict]:
     ]
 
 
+def validate_trace_record(record: dict, index: int, sequences: set[int]) -> list[str]:
+    errors: list[str] = []
+    prefix = f"record {index}"
+    sequence = record.get("sequence")
+    if not isinstance(sequence, int) or sequence <= 0 or sequence in sequences:
+        errors.append(f"{prefix}: invalid/duplicate sequence")
+    sequences.add(sequence)
+    tail = record.get("tail")
+    if not isinstance(tail, list) or len(tail) != record.get("tail_quiets"):
+        errors.append(f"{prefix}: tail length mismatch")
+        return errors
+    moves = [move.get("move") for move in tail]
+    ranks = [move.get("rank") for move in tail]
+    if len(set(moves)) != len(moves) or ranks != sorted(set(ranks)):
+        errors.append(f"{prefix}: duplicate/non-monotonic tail")
+    depth = record.get("depth")
+    improving = bool(record.get("improving"))
+    if not isinstance(depth, int) or depth <= 0:
+        errors.append(f"{prefix}: invalid depth")
+        return errors
+    t0 = (3 + depth * depth) // (2 - int(improving))
+    u34 = max(1, 3 * t0 // 4)
+    mode = record.get("probe_mode")
+    if mode not in ("baseline", "u34"):
+        errors.append(f"{prefix}: invalid/missing probe mode")
+        return errors
+    expected_probe = t0 if mode == "baseline" else u34
+    probe_trigger = record.get("probe_trigger_rank")
+    if not isinstance(probe_trigger, int) or probe_trigger < expected_probe:
+        errors.append(
+            f"{prefix}: {mode} probe trigger precedes its frozen threshold "
+            f"{expected_probe}"
+        )
+    trigger = record.get("baseline_trigger_rank")
+    trigger_depth = record.get("baseline_trigger_depth")
+    skipped = record.get("baseline_skipped_moves")
+    if not isinstance(skipped, list) or len(set(skipped)) != len(skipped):
+        errors.append(f"{prefix}: invalid baseline skipped list")
+        return errors
+    if trigger:
+        if not isinstance(trigger_depth, int) or trigger_depth <= 0:
+            errors.append(f"{prefix}: missing effective baseline trigger depth")
+            return errors
+        effective_t0 = (3 + trigger_depth * trigger_depth) // (2 - int(improving))
+        if trigger < effective_t0:
+            errors.append(
+                f"{prefix}: baseline trigger {trigger} precedes effective T0 "
+                f"{effective_t0} at depth {trigger_depth}"
+            )
+        if mode == "baseline" and trigger != probe_trigger:
+            errors.append(f"{prefix}: baseline probe and live trigger ranks differ")
+        if mode == "baseline" and trigger_depth != depth:
+            errors.append(f"{prefix}: baseline probe and live trigger depths differ")
+        expected = [move["move"] for move in tail if move["rank"] > trigger]
+        if expected != skipped:
+            errors.append(f"{prefix}: rank simulation differs from live MovePicker skip")
+    else:
+        if skipped:
+            errors.append(f"{prefix}: skipped moves without a baseline trigger")
+        if trigger_depth:
+            errors.append(f"{prefix}: trigger depth without a baseline trigger")
+        if mode == "baseline":
+            errors.append(f"{prefix}: baseline probe has no live baseline trigger")
+    for move in tail:
+        if move.get("pruned_by_rest"):
+            if move.get("value") is not None or move.get("nodes") != 0:
+                errors.append(f"{prefix}: downstream-pruned move has value/nodes")
+        elif not isinstance(move.get("value"), int) or not isinstance(move.get("nodes"), int):
+            errors.append(f"{prefix}: searched move lacks integer value/nodes")
+    return errors
+
+
 def validate_trace_structure(records: list[dict]) -> list[str]:
     errors: list[str] = []
     sequences: set[int] = set()
     for index, record in enumerate(records):
-        prefix = f"record {index}"
-        sequence = record.get("sequence")
-        if not isinstance(sequence, int) or sequence <= 0 or sequence in sequences:
-            errors.append(f"{prefix}: invalid/duplicate sequence")
-        sequences.add(sequence)
-        tail = record.get("tail")
-        if not isinstance(tail, list) or len(tail) != record.get("tail_quiets"):
-            errors.append(f"{prefix}: tail length mismatch")
-            continue
-        moves = [move.get("move") for move in tail]
-        ranks = [move.get("rank") for move in tail]
-        if len(set(moves)) != len(moves) or ranks != sorted(set(ranks)):
-            errors.append(f"{prefix}: duplicate/non-monotonic tail")
-        depth = record.get("depth")
-        improving = bool(record.get("improving"))
-        if not isinstance(depth, int) or depth <= 0:
-            errors.append(f"{prefix}: invalid depth")
-            continue
-        t0 = (3 + depth * depth) // (2 - int(improving))
-        u34 = max(1, 3 * t0 // 4)
-        mode = record.get("probe_mode")
-        if mode not in ("baseline", "u34"):
-            errors.append(f"{prefix}: invalid/missing probe mode")
-            continue
-        expected_probe = t0 if mode == "baseline" else u34
-        probe_trigger = record.get("probe_trigger_rank")
-        if not isinstance(probe_trigger, int) or probe_trigger < expected_probe:
-            errors.append(
-                f"{prefix}: {mode} probe trigger precedes its frozen threshold "
-                f"{expected_probe}"
-            )
-        trigger = record.get("baseline_trigger_rank")
-        trigger_depth = record.get("baseline_trigger_depth")
-        skipped = record.get("baseline_skipped_moves")
-        if not isinstance(skipped, list) or len(set(skipped)) != len(skipped):
-            errors.append(f"{prefix}: invalid baseline skipped list")
-            continue
-        if trigger:
-            if not isinstance(trigger_depth, int) or trigger_depth <= 0:
-                errors.append(f"{prefix}: missing effective baseline trigger depth")
-                continue
-            effective_t0 = (3 + trigger_depth * trigger_depth) // (2 - int(improving))
-            if trigger < effective_t0:
-                errors.append(
-                    f"{prefix}: baseline trigger {trigger} precedes effective T0 "
-                    f"{effective_t0} at depth {trigger_depth}"
-                )
-            if mode == "baseline" and trigger != probe_trigger:
-                errors.append(f"{prefix}: baseline probe and live trigger ranks differ")
-            if mode == "baseline" and trigger_depth != depth:
-                errors.append(f"{prefix}: baseline probe and live trigger depths differ")
-            expected = [move["move"] for move in tail if move["rank"] > trigger]
-            if expected != skipped:
-                errors.append(f"{prefix}: rank simulation differs from live MovePicker skip")
-        else:
-            if skipped:
-                errors.append(f"{prefix}: skipped moves without a baseline trigger")
-            if trigger_depth:
-                errors.append(f"{prefix}: trigger depth without a baseline trigger")
-            if mode == "baseline":
-                errors.append(f"{prefix}: baseline probe has no live baseline trigger")
-        for move in tail:
-            if move.get("pruned_by_rest"):
-                if move.get("value") is not None or move.get("nodes") != 0:
-                    errors.append(f"{prefix}: downstream-pruned move has value/nodes")
-            elif not isinstance(move.get("value"), int) or not isinstance(move.get("nodes"), int):
-                errors.append(f"{prefix}: searched move lacks integer value/nodes")
+        errors.extend(validate_trace_record(record, index, sequences))
     return errors
 
 
@@ -934,127 +949,97 @@ def analysis_parameters_frozen(args: argparse.Namespace, root_count: int) -> boo
     )
 
 
-def analyze(args: argparse.Namespace) -> int:
-    trace_path = require_file(Path(args.trace), "trace")
-    roots_path = require_file(Path(args.roots), "root manifest")
-    collection_path = require_file(Path(args.collection), "collection receipt")
-    repeat_path = require_file(Path(args.repeat_trace), "repeat trace") if args.repeat_trace else None
-    repeat_collection_path = (
-        require_file(Path(args.repeat_collection), "repeat collection receipt")
-        if args.repeat_collection
-        else None
-    )
-    _, roots = roots_from_manifest(roots_path, args.split, args.limit)
-    root_fens = {root["fen"] for root in roots}
-    records = [record for record in read_trace(trace_path) if record.get("root_fen") in root_fens]
-    structure_errors = validate_trace_structure(records)
-    if not records:
-        structure_errors.append("selected split has zero trace records")
-    record_modes = {record.get("probe_mode") for record in records}
-    probe_mode = next(iter(record_modes)) if len(record_modes) == 1 else None
-    if probe_mode not in ("baseline", "u34"):
-        structure_errors.append(
-            f"trace must contain exactly one supported probe mode, got {sorted(map(str, record_modes))}"
-        )
-    oracle_checked, oracle_errors = validate_trace_oracles(records, args.oracle_sample)
-    structure_errors.extend(oracle_errors)
+def scan_trace_for_analysis(
+    trace_path: Path, root_fens: set[str], oracle_sample_count: int
+) -> dict:
+    """Validate and summarize a full trace with bounded memory.
 
-    full_contract = analysis_parameters_frozen(args, len(roots))
-    if not full_contract:
-        structure_errors.append("analysis parameters differ from the frozen full-split gate")
+    Only the frozen oracle sample is retained.  All other records are released
+    after their structural and stratum checks, so a valid 24k-record trace does
+    not expand into several gigabytes of Python objects.
+    """
+    record_count = 0
+    exposed_count = 0
+    modes: set[str | None] = set()
+    strata: collections.Counter = collections.Counter()
+    structure_errors: list[str] = []
+    sequences: set[int] = set()
+    oracle_heap: list[tuple[int, int, dict]] = []
 
-    repeat_identical = (
-        repeat_path is not None and files_byte_identical(trace_path, repeat_path)
-    )
-    if repeat_path is None or repeat_path.resolve() == trace_path.resolve():
-        structure_errors.append("repeat trace must be a distinct file")
-    repeat_records = records if repeat_identical else []
-    collection = load_json(collection_path)
-    structure_errors.extend(
-        validate_collection_contract(
-            collection,
-            collection_path,
-            trace_path,
-            records,
-            roots_path,
-            root_fens,
-            args.split,
-            probe_mode,
-        )
-    )
-    if not isinstance(collection, dict):
-        collection = {}
-    repeat_collection = (
-        load_json(repeat_collection_path) if repeat_collection_path is not None else None
-    )
-    if repeat_collection_path is None or repeat_collection_path.resolve() == collection_path.resolve():
-        structure_errors.append("repeat collection receipt must be a distinct file")
-    elif repeat_path is not None:
-        structure_errors.extend(
-            validate_collection_contract(
-                repeat_collection,
-                repeat_collection_path,
-                repeat_path,
-                repeat_records,
-                roots_path,
-                root_fens,
-                args.split,
-                probe_mode,
+    for record in iter_trace(trace_path):
+        if record.get("root_fen") not in root_fens:
+            continue
+        index = record_count
+        record_count += 1
+        structure_errors.extend(validate_trace_record(record, index, sequences))
+        modes.add(record.get("probe_mode"))
+
+        if record.get("baseline_trigger_rank") and record.get("baseline_skipped_moves"):
+            exposed_count += 1
+            bucket = depth_stratum(record["depth"])
+            if bucket:
+                strata[
+                    f"{bucket}|improving={str(bool(record['improving'])).lower()}"
+                ] += 1
+
+        if oracle_sample_count > 0:
+            rank = int.from_bytes(
+                hashlib.sha256(
+                    f"{record.get('node_key')}:{record.get('fen')}".encode("ascii")
+                ).digest(),
+                "big",
             )
-        )
-    if isinstance(collection, dict) and isinstance(repeat_collection, dict):
-        if collection.get("engine", {}).get("sha256") != repeat_collection.get("engine", {}).get(
-            "sha256"
-        ):
-            structure_errors.append("primary and repeat receipts use different trace engines")
-        first_transcript = Path(collection.get("transcript", {}).get("path", "")).resolve()
-        second_transcript = Path(repeat_collection.get("transcript", {}).get("path", "")).resolve()
-        if first_transcript == second_transcript:
-            structure_errors.append("primary and repeat receipts reuse one UCI transcript")
-    primary_nodes = {
-        item["fen"]: item["nodes"]
-        for item in collection.get("results", [])
-        if item.get("fen") in root_fens
+            # A min-heap over negative rank/index keeps the worst selected
+            # record at slot zero.  The index preserves sorted()'s stable tie
+            # behavior without ever comparing the record dictionaries.
+            candidate = (-rank, -index, record)
+            if len(oracle_heap) < oracle_sample_count:
+                heapq.heappush(oracle_heap, candidate)
+            elif candidate > oracle_heap[0]:
+                heapq.heapreplace(oracle_heap, candidate)
+
+    oracle_sample = [
+        entry[2]
+        for entry in sorted(oracle_heap, key=lambda entry: (-entry[0], -entry[1]))
+    ]
+    return {
+        "records": record_count,
+        "exposed": exposed_count,
+        "modes": modes,
+        "strata": strata,
+        "structural_errors": structure_errors,
+        "oracle_sample": oracle_sample,
     }
 
-    exposed = [
-        record
-        for record in records
-        if record.get("baseline_trigger_rank") and record.get("baseline_skipped_moves")
-    ]
-    strata = collections.Counter()
-    for record in exposed:
-        bucket = depth_stratum(record["depth"])
-        if bucket:
-            strata[f"{bucket}|improving={str(bool(record['improving'])).lower()}"] += 1
 
-    policies = list(BASELINE_POLICIES if probe_mode == "baseline" else U34_POLICIES)
-    if probe_mode not in ("baseline", "u34"):
-        policies = []
-    metrics: dict[str, dict] = {}
+def score_trace_stream(
+    trace_path: Path,
+    root_fens: set[str],
+    policies: list[str],
+    total_primary_nodes: int,
+) -> dict[str, dict]:
+    """Score all policies in one streaming pass over the authenticated trace."""
+    counters_by_policy = {policy: collections.Counter() for policy in policies}
     per_root: dict[str, dict[str, collections.Counter]] = collections.defaultdict(
         lambda: {policy: collections.Counter() for policy in policies}
     )
-    total_primary_nodes = sum(primary_nodes.values())
-    if len(primary_nodes) != len(roots) or total_primary_nodes <= 0:
-        structure_errors.append(
-            f"primary-node receipt covers {len(primary_nodes)}/{len(roots)} selected roots"
-        )
 
-    for policy in policies:
-        counters: collections.Counter = collections.Counter()
-        for record in records:
-            thresholds = policy_thresholds(record)
-            baseline_skipped = set(record["baseline_skipped_moves"])
-            for move in record["tail"]:
+    for record in iter_trace(trace_path):
+        if record.get("root_fen") not in root_fens:
+            continue
+        thresholds = policy_thresholds(record)
+        baseline_skipped = set(record["baseline_skipped_moves"])
+        for move in record["tail"]:
+            baseline_keep = retained("baseline", move, thresholds, baseline_skipped)
+            critical = (
+                not record["baseline_cutoff"]
+                and not move["pruned_by_rest"]
+                and isinstance(move["value"], int)
+                and move["value"] > record["best_after"]
+            )
+            for policy in policies:
                 keep = retained(policy, move, thresholds, baseline_skipped)
-                baseline_keep = retained("baseline", move, thresholds, baseline_skipped)
-                critical = (
-                    not record["baseline_cutoff"]
-                    and not move["pruned_by_rest"]
-                    and isinstance(move["value"], int)
-                    and move["value"] > record["best_after"]
-                )
+                counters = counters_by_policy[policy]
                 counters["moves"] += 1
                 counters["retained"] += int(keep)
                 counters["critical"] += int(critical)
@@ -1070,6 +1055,9 @@ def analyze(args: argparse.Namespace) -> int:
                 root_counter["critical"] += int(critical)
                 root_counter["critical_retained"] += int(critical and keep)
 
+    metrics: dict[str, dict] = {}
+    for policy in policies:
+        counters = counters_by_policy[policy]
         root_retention = []
         root_recall = []
         for root_metrics in per_root.values():
@@ -1100,6 +1088,106 @@ def analyze(args: argparse.Namespace) -> int:
                 else None
             ),
         }
+    return metrics
+
+
+def analyze(args: argparse.Namespace) -> int:
+    trace_path = require_file(Path(args.trace), "trace")
+    roots_path = require_file(Path(args.roots), "root manifest")
+    collection_path = require_file(Path(args.collection), "collection receipt")
+    repeat_path = require_file(Path(args.repeat_trace), "repeat trace") if args.repeat_trace else None
+    repeat_collection_path = (
+        require_file(Path(args.repeat_collection), "repeat collection receipt")
+        if args.repeat_collection
+        else None
+    )
+    _, roots = roots_from_manifest(roots_path, args.split, args.limit)
+    root_fens = {root["fen"] for root in roots}
+    trace_summary = scan_trace_for_analysis(trace_path, root_fens, args.oracle_sample)
+    record_count = trace_summary["records"]
+    exposed_count = trace_summary["exposed"]
+    record_modes = trace_summary["modes"]
+    strata = trace_summary["strata"]
+    structure_errors = trace_summary["structural_errors"]
+    if not record_count:
+        structure_errors.append("selected split has zero trace records")
+    probe_mode = next(iter(record_modes)) if len(record_modes) == 1 else None
+    if probe_mode not in ("baseline", "u34"):
+        structure_errors.append(
+            f"trace must contain exactly one supported probe mode, got {sorted(map(str, record_modes))}"
+        )
+    oracle_checked, oracle_errors = validate_trace_oracles(
+        trace_summary["oracle_sample"], args.oracle_sample
+    )
+    structure_errors.extend(oracle_errors)
+
+    full_contract = analysis_parameters_frozen(args, len(roots))
+    if not full_contract:
+        structure_errors.append("analysis parameters differ from the frozen full-split gate")
+
+    repeat_identical = (
+        repeat_path is not None and files_byte_identical(trace_path, repeat_path)
+    )
+    if repeat_path is None or repeat_path.resolve() == trace_path.resolve():
+        structure_errors.append("repeat trace must be a distinct file")
+    repeat_record_count = record_count if repeat_identical else 0
+    collection = load_json(collection_path)
+    structure_errors.extend(
+        validate_collection_contract(
+            collection,
+            collection_path,
+            trace_path,
+            record_count,
+            roots_path,
+            root_fens,
+            args.split,
+            probe_mode,
+        )
+    )
+    if not isinstance(collection, dict):
+        collection = {}
+    repeat_collection = (
+        load_json(repeat_collection_path) if repeat_collection_path is not None else None
+    )
+    if repeat_collection_path is None or repeat_collection_path.resolve() == collection_path.resolve():
+        structure_errors.append("repeat collection receipt must be a distinct file")
+    elif repeat_path is not None:
+        structure_errors.extend(
+            validate_collection_contract(
+                repeat_collection,
+                repeat_collection_path,
+                repeat_path,
+                repeat_record_count,
+                roots_path,
+                root_fens,
+                args.split,
+                probe_mode,
+            )
+        )
+    if isinstance(collection, dict) and isinstance(repeat_collection, dict):
+        if collection.get("engine", {}).get("sha256") != repeat_collection.get("engine", {}).get(
+            "sha256"
+        ):
+            structure_errors.append("primary and repeat receipts use different trace engines")
+        first_transcript = Path(collection.get("transcript", {}).get("path", "")).resolve()
+        second_transcript = Path(repeat_collection.get("transcript", {}).get("path", "")).resolve()
+        if first_transcript == second_transcript:
+            structure_errors.append("primary and repeat receipts reuse one UCI transcript")
+    primary_nodes = {
+        item["fen"]: item["nodes"]
+        for item in collection.get("results", [])
+        if item.get("fen") in root_fens
+    }
+
+    policies = list(BASELINE_POLICIES if probe_mode == "baseline" else U34_POLICIES)
+    if probe_mode not in ("baseline", "u34"):
+        policies = []
+    total_primary_nodes = sum(primary_nodes.values())
+    if len(primary_nodes) != len(roots) or total_primary_nodes <= 0:
+        structure_errors.append(
+            f"primary-node receipt covers {len(primary_nodes)}/{len(roots)} selected roots"
+        )
+    metrics = score_trace_stream(trace_path, root_fens, policies, total_primary_nodes)
 
     pareto = []
     eligible = [
@@ -1139,7 +1227,7 @@ def analyze(args: argparse.Namespace) -> int:
     gate_pass = (
         not structure_errors
         and repeat_identical
-        and len(exposed) >= args.min_exposed
+        and exposed_count >= args.min_exposed
         and stratum_gate
         and baseline_exact
         and (no_lmp_exact is True if probe_mode == "baseline" else True)
@@ -1159,8 +1247,8 @@ def analyze(args: argparse.Namespace) -> int:
             ),
         },
         "counts": {
-            "records": len(records),
-            "baseline_exposed": len(exposed),
+            "records": record_count,
+            "baseline_exposed": exposed_count,
             "dual_oracle_records": oracle_checked,
             "roots_with_primary_nodes": len(primary_nodes),
             "primary_nodes": total_primary_nodes,
@@ -1186,8 +1274,8 @@ def analyze(args: argparse.Namespace) -> int:
     }
     canonical_json(Path(args.out).resolve(), report)
     print(
-        f"analysis {'PASS' if gate_pass else 'STOP'}: records {len(records)}, "
-        f"baseline-exposed {len(exposed)}, repeat={repeat_identical}, "
+        f"analysis {'PASS' if gate_pass else 'STOP'}: records {record_count}, "
+        f"baseline-exposed {exposed_count}, repeat={repeat_identical}, "
         f"strata={dict(sorted(strata.items()))}"
     )
     print(f"Pareto screen: {', '.join(pareto) if pareto else 'none'}")

@@ -1,7 +1,10 @@
 import argparse
 import copy
+import hashlib
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -136,6 +139,55 @@ class LmpShadowHarnessTests(unittest.TestCase):
         record["tail"][1]["value"] = 0
         errors = harness.validate_trace_structure([record])
         self.assertTrue(any("downstream-pruned" in error for error in errors))
+
+    def test_streaming_scan_matches_frozen_oracle_order(self):
+        records = []
+        for sequence, node_key in enumerate(("key-b", "key-a", "key-c"), 1):
+            record = copy.deepcopy(sample_record())
+            record.update(
+                {
+                    "sequence": sequence,
+                    "node_key": node_key,
+                    "fen": f"node-{sequence}",
+                }
+            )
+            records.append(record)
+        expected = sorted(
+            records,
+            key=lambda record: hashlib.sha256(
+                f"{record['node_key']}:{record['fen']}".encode("ascii")
+            ).digest(),
+        )[:2]
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "trace.jsonl"
+            trace.write_text(
+                "".join(json.dumps(record) + "\n" for record in records),
+                encoding="utf-8",
+            )
+            summary = harness.scan_trace_for_analysis(trace, {"root"}, 2)
+        self.assertEqual(summary["records"], 3)
+        self.assertEqual(summary["exposed"], 3)
+        self.assertEqual(summary["modes"], {"baseline"})
+        self.assertEqual(summary["structural_errors"], [])
+        self.assertEqual(
+            [record["sequence"] for record in summary["oracle_sample"]],
+            [record["sequence"] for record in expected],
+        )
+
+    def test_streaming_policy_scores_match_known_single_record(self):
+        record = sample_record()
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "trace.jsonl"
+            trace.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            metrics = harness.score_trace_stream(
+                trace, {"root"}, ["baseline", "no-LMP"], 100
+            )
+        self.assertEqual(metrics["baseline"]["retained"], 0)
+        self.assertEqual(metrics["baseline"]["critical_retained"], 0)
+        self.assertEqual(metrics["no-LMP"]["retained"], 4)
+        self.assertEqual(metrics["no-LMP"]["critical_retained"], 2)
+        self.assertEqual(metrics["no-LMP"]["shadow_nodes_retained"], 14)
+        self.assertEqual(metrics["no-LMP"]["class_retained_node_weighted"], 1.0)
 
     def test_uci_search_parser_uses_last_info_before_bestmove(self):
         output = "\n".join(
