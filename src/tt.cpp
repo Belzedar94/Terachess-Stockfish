@@ -18,6 +18,8 @@
 
 #include "tt.h"
 
+#include "tera_lmp_shadow.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -137,10 +139,18 @@ TTWriter::TTWriter(TTEntry* tte) :
 
 void TTWriter::write(
   Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev, u8 curr_generation) {
+#ifdef TERA_LMP_TRACE
+    if (TeraLmpShadow::suppress_writes())
+        return;
+#endif
     entry->save(k, v, pv, b, d, m, ev, curr_generation);
 }
 
 void TTWriter::penalize(int penalty) {
+#ifdef TERA_LMP_TRACE
+    if (TeraLmpShadow::suppress_writes())
+        return;
+#endif
     // guard against racy underflows, default to "unoccupied"
     entry->depth8 = std::max(int(entry->depth8) - penalty, 0);
 }

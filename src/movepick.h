@@ -23,6 +23,10 @@
 #include "movegen.h"
 #include "types.h"
 
+#ifdef TERA_LMP_TRACE
+    #include <vector>
+#endif
+
 namespace Stockfish {
 
 class Position;
@@ -61,6 +65,12 @@ class MovePicker {
     ~MovePicker() { *arenaTop -= MAX_MOVES; }
     Move next_move();
     void skip_quiet_moves();
+#ifdef TERA_LMP_TRACE
+    // Drain a byte-for-byte snapshot of the current picker, leaving this
+    // instance and its arena exactly as they were. Offline LMP probes use the
+    // returned order to identify the quiet tail the baseline is about to skip.
+    std::vector<Move> trace_remaining_moves();
+#endif
 
    private:
     template<typename Pred>

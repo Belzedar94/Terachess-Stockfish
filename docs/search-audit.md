@@ -155,8 +155,10 @@ Consecuencias operativas:
 2. La tasa de tablas real es baja (consistente con la predicción del plan <10 %)
    ⇒ SPRT eficiente: cada partida informa ~2× lo que una de ajedrez
    (1 nElo ≈ 2 Elo). Se mantienen bounds en Elo crudo [1, 6].
-3. Coste por SPRT estimado: 5.000 partidas × ~18 s ≈ 25 h monohilo ⇒ ~1 h con
-   24 hilos en paralelo. Presupuesto viable.
+3. Coste de una **sonda fixed-nodes** estimado: 5.000 partidas × ~18 s ≈ 25 h
+   monohilo ⇒ ~1 h con 24 hilos en paralelo. No es una previsión de STC/LTC:
+   el consumo real con reloj queda sujeto al smoke oficial de
+   `docs/statistics.md` §5.
 4. Una partida de ~575 plies genera del orden de 300–500 registros tras filtros
    ⇒ el datagen es eficiente por partida aunque cada partida sea larga.
 5. La adjudicación por evaluación es **opcional** (red de seguridad), no
@@ -175,19 +177,20 @@ bent rider / real) en vez de `% 8`. Riesgo residual: la ordenación de
 movimientos es peor de lo que sería con historial por tipo exacto; afecta a
 todas las mediciones por igual (no sesga comparaciones A/B).
 
-## 5. SEE con piezas de pantalla — **RIESGO ALTO, mitigado parcialmente**
+## 5. SEE con piezas de pantalla — **DEUDA DOCUMENTAL CERRADA**
 
-Cannon/Archer/Sorceress capturan saltando una pantalla: rompen el supuesto de
-SEE de que el atacante llega por su propia línea despejada, y de que retirar un
-atacante descubre al siguiente. `attackers_to` sí las modela; el bucle de
-intercambios de `see_ge` NO recalcula pantallas tras cada captura.
+La premisa original de esta sección era falsa. Desde el port F1 `94fab4f`,
+`see_ge` no conserva el bucle incremental de ajedrez: en **cada** intercambio
+ejecuta `attackers_to(to, occupied)`. Esa función recalcula con la ocupación
+hipotética tanto `hopper_captures` para Cannon/Archer/Sorceress como los ataques
+de Eagle/Rhino. Después intersecta con `occupied`, de modo que los atacantes ya
+retirados no sobreviven por permanecer en los bitboards de tipo.
 
-**Decisión F2**: se deja el SEE estándar (los hoppers participan como atacantes
-detectados por `attackers_to` pero el intercambio simulado puede ser inexacto).
-Fixtures de pantallas existen en F0 y el movegen es correcto (perft masivo
-1.000 posiciones / 37,4 M nodos, 0 discrepancias) ⇒ el riesgo es de *calidad de
-poda*, no de legalidad. Candidata F5: excluir hoppers del bucle de SEE
-(tratarlos con valor fijo) y medir.
+**Decisión (auditada 2026-08-29)**: no existe la familia SEE descrita antes y
+no se gastará un SPRT en "recalcular pantallas": ya es el baseline. Queda como
+posible optimización de velocidad la mezcla incremental/recomputada anunciada
+por el propio `T256-TODO`, pero cualquier versión deberá ser bit-exacta contra
+la implementación actual en exchanges con 0/1/2 pantallas antes de medir NPS.
 
 ## 6–10. Resto de heurísticas
 
@@ -200,13 +203,45 @@ poda*, no de legalidad. Candidata F5: excluir hoppers del bucle de SEE
 | Repetición / cuckoo | `upcoming_repetition` desactivado (tabla de 8192 no escala a 26 tipos × 256 casillas) | Se pierde detección temprana de repetición; la repetición normal sí funciona | ADR aceptado; re-evaluar con tabla 2^17 en F5 |
 | Gestión de tiempo | Sin cambios respecto a master | Las partidas son 2–4× más largas (plies medios medidos en las sondas) | Medir en F4 antes de fijar TC |
 
+## 11. Refresh upstream y huecos de ordering (2026-08-29)
+
+Se comparó el chasis con Stockfish oficial pineado en
+`8bc5caa2e4b1d4c189b1428e93158b10d3edb0b6`. El blob de `history.h` de F1a es
+exactamente el de `ebcea3efe9c1b8748e080111c727c33c544d7e06`; entre esos dos
+pins hay 71 commits, 24 de ellos tocando search/movepick/history/position/
+movegen/thread.
+
+No hay un lote portable de "Elo gratis": la nueva NNUE rompe el contrato S,
+las optimizaciones de ataques son 8×8, los fixes de PV larga dependen de
+Syzygy (eliminado aquí) y los cambios NMP/futility/LMR usan márgenes sensibles a
+ADR-001. Se retienen como candidatos **aislados**, no como cherry-pick conjunto:
+
+- `50221673`: inicializar `ContinuationHistory` compartida una sola vez por
+  nodo NUMA, no una vez por worker. Aquí son 4 instancias de 32 MiB, por lo que
+  T24 escribe ~3 GiB redundantes al limpiar un nodo.
+- `5062aee5`: ubicar esos 128 MiB compartidos en páginas grandes; upstream midió
+  ~+1 % NPS, pero el efecto local debe medirse por arquitectura.
+- `4150d22b`: prefetch de correction histories, adaptando `pc` a `piece_slot`.
+- Fusionar la prueba temporal de `legal()` y `gives_check()`: hoy cada candidato
+  legal aplica y revierte el tablero dos veces antes del `do_move` real. La
+  versión candidata debe conservar la implementación actual como referencia y
+  demostrar igualdad en todos los pseudo-legales del corpus antes de jugar.
+
+También se cuantificó un hueco específico de Terachess: sobre las 256 raíces
+congeladas de P1, el oráculo B enumeró **46.453** legales y **45.198** quiets.
+Solo **5.933 (13,127 %)** de las quiets mueven N/B/R/Q, los únicos tipos con
+`threatByLesser` no vacío; **39.265 (86,873 %)** reciben exactamente cero señal
+de amenaza por pertenecer a los otros 22 tipos. Es una clase ciega medible, no
+Elo demostrado; requiere arnés de clasificación antes de granja.
+
 ---
 
 ## Conclusión de la auditoría
 
 Un bug real y corregido (LMR), una heurística de riesgo alto documentada y
 abierta como familia (LMP), una métrica de calibración invalidada honestamente
-(blunder con eval material) y cuatro riesgos aceptados con su condición de
-revisión. **Ninguna medición posterior de este proyecto debe presentarse como
-fuerza absoluta hasta que LMP y las escalas de futility se hayan barrido en
-F5.** Las comparaciones A/B entre builds propios sí son válidas desde ya.
+(blunder con eval material), una deuda SEE retirada por premisa falsa y varios
+huecos medidos aún sin Elo. **Ninguna medición posterior de este proyecto debe
+presentarse como fuerza absoluta hasta que LMP y las escalas de futility se
+hayan barrido en F5.** Las comparaciones A/B entre builds propios sí son válidas
+desde ya.

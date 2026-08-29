@@ -33,6 +33,11 @@
 #include <string>
 #include <utility>
 
+#ifdef TERA_LMP_TRACE
+    #include <optional>
+    #include <vector>
+#endif
+
 #include "bitboard.h"
 #include "evaluate.h"
 #include "history.h"
@@ -41,6 +46,8 @@
 #include "movepick.h"
 #include "nnue/tera_network.h"
 #include "position.h"
+#include "tera_lmp_shadow.h"
+#include "tera_lmp_trace.h"
 #include "thread.h"
 #include "timeman.h"
 #include "tt.h"
@@ -258,6 +265,9 @@ void Search::Worker::start_searching() {
 bool Search::Worker::iterative_deepening() {
 
     nnue_start_search();
+#ifdef TERA_LMP_TRACE
+    TeraLmpTrace::set_root(u64(rootPos.key()), rootPos.fen());
+#endif
 
     SearchManager* mainThread = (is_mainthread() ? main_manager() : nullptr);
 
@@ -751,6 +761,11 @@ Value Search::Worker::search(
     SearchedList capturesSearched;
     SearchedList quietsSearched;
 
+#ifdef TERA_LMP_TRACE
+    std::optional<TeraLmpTrace::Record> lmpTraceRecord;
+    int                                 lmpQuietPrefixCount = 0;
+#endif
+
     // Step 1. Initialize node
     ss->inCheck   = bool(pos.checkers());
     priorCapture  = pos.captured_piece();
@@ -760,7 +775,11 @@ Value Search::Worker::search(
     maxValue      = VALUE_INFINITE;
 
     // Check for the available remaining time
-    if (is_mainthread())
+    if (is_mainthread()
+#ifdef TERA_LMP_TRACE
+        && !TeraLmpShadow::suppress_writes()
+#endif
+    )
         main_manager()->check_time(*this);
 
     // Used to send selDepth info to GUI (selDepth counts from 1, ply from 0)
@@ -1084,6 +1103,10 @@ moves_loop:  // When in check, search starts here
         capture    = pos.capture_stage(move);
         movedPiece = pos.moved_piece(move);
         givesCheck = pos.gives_check(move);
+#ifdef TERA_LMP_TRACE
+        if (!capture && !TeraLmpShadow::suppress_writes())
+            ++lmpQuietPrefixCount;
+#endif
 
         // Calculate new depth for this move
         newDepth = depth - 1;
@@ -1102,8 +1125,307 @@ moves_loop:  // When in check, search starts here
         if (!rootNode && pos.non_pawn_material(us) && !is_loss(bestValue))
         {
             // Skip quiet moves if movecount exceeds our threshold
-            if (moveCount >= (3 + depth * depth) / (2 - improving))
+            const int baselineLmpThreshold = (3 + depth * depth) / (2 - improving);
+#ifdef TERA_LMP_TRACE
+            // Baseline mode replays from the exact live LMP trigger/state and
+            // labels only lenient policies. U3/4 is a separate direction-control
+            // trace because its earlier state cannot label baseline tails exactly.
+            const int shadowProbeThreshold = TeraLmpTrace::sink().baseline_mode()
+                                               ? baselineLmpThreshold
+                                               : std::max(1, 3 * baselineLmpThreshold / 4);
+            if (moveCount >= shadowProbeThreshold && !TeraLmpShadow::suppress_writes()
+                && !ss->inCheck && !lmpTraceRecord)
+            {
+                const u64 sequence =
+                  TeraLmpTrace::sink().claim(threads.size(), int(depth), improving);
+                if (sequence)
+                {
+                    const std::vector<Move> remaining = mp.trace_remaining_moves();
+                    struct RankedQuiet {
+                        Move move;
+                        int  rank;
+                    };
+                    std::vector<RankedQuiet> quietTail;
+                    int                      finalRank = moveCount;
+
+                    for (Move candidate : remaining)
+                    {
+                        if (candidate == excludedMove || !pos.legal(candidate))
+                            continue;
+                        ++finalRank;
+                        if (!pos.capture_stage(candidate))
+                            quietTail.push_back({candidate, finalRank});
+                    }
+
+                    if (!quietTail.empty())
+                    {
+                            TeraLmpTrace::Record record;
+                            record.sequence       = sequence;
+                            record.rootKey        = TeraLmpTrace::root_key();
+                            record.nodeKey        = u64(pos.key());
+                            record.rootFen        = TeraLmpTrace::root_fen();
+                            record.fen            = pos.fen();
+                            record.nodeType       = PvNode ? "pv" : cutNode ? "cut" : "all";
+                            record.probeMode      = std::string(TeraLmpTrace::sink().probe_mode());
+                            record.ply            = ss->ply;
+                            record.depth          = depth;
+                            record.pieceCount     = pos.count<ALL_PIECES>();
+                            record.alpha          = int(alpha);
+                            record.beta           = int(beta);
+                            record.bestBefore      = int(bestValue);
+                            record.probeTriggerRank = moveCount;
+                            record.legalMoveCount   = finalRank;
+                            record.quietPrefixCount = lmpQuietPrefixCount;
+                            record.tailQuiets       = int(quietTail.size());
+                            record.improving        = improving;
+                            record.tail.reserve(quietTail.size());
+
+                            // Clone the search stack through ss+2. The shadow uses
+                            // the live Position/NNUE accumulator only while each
+                            // move is made and always undoes it before returning.
+                            std::array<Stack, MAX_PLY + 10> frozenStack{};
+                            Stack* const primaryRoot = ss - ss->ply;
+                            Stack* const frozenRoot  = frozenStack.data() + 7;
+                            for (int offset = -7; offset <= ss->ply + 2; ++offset)
+                                frozenRoot[offset] = primaryRoot[offset];
+                            for (int offset = ss->ply + 3; offset <= MAX_PLY + 2; ++offset)
+                                frozenRoot[offset].ply = offset;
+
+                            const u64      savedNodes       = u64(nodes);
+                            const int      savedSelDepth    = selDepth;
+                            const int      savedNmpMinPly   = nmpMinPly;
+                            ExtMove* const savedArenaTop    = movesArenaTop;
+
+                            {
+                                TeraLmpShadow::ScopedReadOnlySearch readOnlyShadow;
+
+                                for (const RankedQuiet& ranked : quietTail)
+                                {
+                                    // Every candidate is an independent causal
+                                    // replay from precisely the same thread state.
+                                    nodes     = savedNodes;
+                                    selDepth  = savedSelDepth;
+                                    nmpMinPly = savedNmpMinPly;
+
+                                    auto   shadowStack = frozenStack;
+                                    Stack* shadowSs = shadowStack.data() + 7 + ss->ply;
+                                    PVMoves shadowParentPv;
+                                    PVMoves shadowChildPv;
+                                    shadowSs->pv       = &shadowParentPv;
+                                    (shadowSs + 1)->pv = nullptr;
+
+                                    TeraLmpTrace::ShadowMove result;
+                                    result.rank       = ranked.rank;
+                                    result.move       = UCIEngine::move(ranked.move);
+                                    result.givesCheck = pos.gives_check(ranked.move);
+
+                                    const Move  shadowMove       = ranked.move;
+                                    const Piece shadowMovedPiece = pos.moved_piece(shadowMove);
+                                    Depth       shadowDepth      = depth;
+                                    Depth       shadowNewDepth   = shadowDepth - 1;
+                                    int         shadowR = reduction(improving, shadowDepth,
+                                                                    ranked.rank, beta - alpha);
+
+                                    if (shadowSs->ttPv)
+                                        shadowR += 1006;
+
+                                    int shadowLmrDepth = shadowNewDepth - shadowR / 1024;
+                                    if (result.givesCheck)
+                                    {
+                                        const Piece capturedPiece = pos.piece_on(shadowMove.to_sq());
+                                        const int captHist =
+                                          captureHistory[shadowMovedPiece][shadowMove.to_sq()]
+                                                        [type_of(capturedPiece)];
+
+                                        if (shadowLmrDepth < 7)
+                                        {
+                                            const Value futilityValue =
+                                              shadowSs->staticEval + 231 + 232 * shadowLmrDepth
+                                              + PieceValue[capturedPiece] + 131 * captHist / 1024;
+                                            if (futilityValue <= alpha)
+                                                result.prunedByRest = true;
+                                        }
+
+                                        const int margin = 175 * shadowDepth + captHist * 34 / 1024;
+                                        if (!result.prunedByRest
+                                            && (alpha >= VALUE_DRAW
+                                                || pos.non_pawn_material(us)
+                                                     != PieceValue[shadowMovedPiece])
+                                            && !pos.see_ge(shadowMove, -margin))
+                                            result.prunedByRest = true;
+                                    }
+                                    else
+                                    {
+                                        const int dIndex =
+                                          std::min(int(shadowDepth), int(lmrDivisor.size())) - 1;
+                                        int history =
+                                          (*contHist[0])[piece_slot(shadowMovedPiece)]
+                                                        [shadowMove.to_sq()]
+                                          + (*contHist[1])[piece_slot(shadowMovedPiece)]
+                                                          [shadowMove.to_sq()]
+                                          + sharedHistory.pawn_entry(pos)[shadowMovedPiece]
+                                                                          [shadowMove.to_sq()];
+
+                                        if (history < -4313 * shadowDepth)
+                                            result.prunedByRest = true;
+
+                                        history +=
+                                          64 * mainHistory[us][shadowMove.raw() & 0xFFFF] / 32;
+                                        shadowLmrDepth += history / lmrDivisor[dIndex];
+
+                                        const Value futilityValue =
+                                          shadowSs->staticEval
+                                          + (40 + 138 * !bestMove + 117 * shadowLmrDepth
+                                             + 90 * (shadowSs->staticEval > alpha));
+
+                                        if (!result.prunedByRest && !shadowSs->inCheck
+                                            && shadowLmrDepth < 12 && futilityValue <= alpha)
+                                            result.prunedByRest = true;
+
+                                        shadowLmrDepth = std::max(shadowLmrDepth, 0);
+                                        if (!result.prunedByRest
+                                            && !pos.see_ge(shadowMove,
+                                                           -25 * shadowLmrDepth * shadowLmrDepth))
+                                            result.prunedByRest = true;
+                                    }
+
+                                    if (result.prunedByRest)
+                                    {
+                                        record.tail.push_back(std::move(result));
+                                        continue;
+                                    }
+
+                                    int shadowExtension =
+                                      result.givesCheck && shadowDepth > 6
+                                          && std::abs(shadowSs->staticEval) > 100;
+                                    StateInfo shadowState;
+                                    const u64 shadowNodesBefore = savedNodes;
+                                    do_move(pos, shadowMove, shadowState, result.givesCheck, shadowSs);
+                                    shadowNewDepth += shadowExtension;
+
+                                    if (shadowSs->ttPv)
+                                        shadowR -= 2766 + PvNode * 1017
+                                                 + (ttData.value > alpha) * 838
+                                                 + (ttData.depth >= shadowDepth)
+                                                     * (923 + cutNode * 955);
+
+                                    shadowR += 714;
+                                    shadowR -= std::min(ranked.rank, 40) * 62;
+                                    shadowR -= std::abs(correctionValue) / 26131;
+                                    if (cutNode)
+                                        shadowR += 3995 + 1059 * !ttData.move;
+                                    if (ttCapture)
+                                        shadowR += 1039;
+                                    if ((shadowSs + 1)->cutoffCnt > 1)
+                                        shadowR += 236
+                                                 + 1079 * ((shadowSs + 1)->cutoffCnt > 2)
+                                                 + 1143 * allNode;
+
+                                    shadowSs->statScore =
+                                      2 * mainHistory[us][shadowMove.raw() & 0xFFFF]
+                                      + (*contHist[0])[piece_slot(shadowMovedPiece)]
+                                                      [shadowMove.to_sq()]
+                                      + (*contHist[1])[piece_slot(shadowMovedPiece)]
+                                                      [shadowMove.to_sq()];
+                                    shadowR -= shadowSs->statScore * 445 / 4096;
+                                    if (allNode)
+                                        shadowR += shadowR * 272 / (256 * shadowDepth + 285);
+
+                                    Value shadowValue;
+                                    if (shadowDepth >= 2 && ranked.rank > 1)
+                                    {
+                                        Depth d =
+                                          std::max(1,
+                                                   std::min(shadowNewDepth - shadowR / 1024,
+                                                            shadowNewDepth + 2))
+                                          + PvNode;
+                                        shadowSs->reduction = shadowNewDepth - d;
+                                        shadowValue =
+                                          -search<NonPV>(pos, shadowSs + 1, -(alpha + 1), -alpha,
+                                                         d, true);
+                                        shadowSs->reduction = 0;
+
+                                        if (shadowValue > alpha)
+                                        {
+                                            const bool doDeeper =
+                                              d < shadowNewDepth && shadowValue > bestValue + 52;
+                                            const bool doShallower = shadowValue < bestValue + 9;
+                                            shadowNewDepth += doDeeper - doShallower;
+                                            if (shadowNewDepth > d)
+                                                shadowValue =
+                                                  -search<NonPV>(pos, shadowSs + 1, -(alpha + 1),
+                                                                 -alpha, shadowNewDepth, !cutNode);
+                                            update_continuation_histories(
+                                              shadowSs, shadowMovedPiece, shadowMove.to_sq(), 1415);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (!ttData.move)
+                                            shadowR += 1085;
+                                        shadowValue =
+                                          -search<NonPV>(
+                                            pos, shadowSs + 1, -(alpha + 1), -alpha,
+                                            shadowNewDepth - (shadowR > 5039)
+                                              - (shadowR > 5223 && shadowNewDepth > 2),
+                                            !cutNode);
+                                    }
+
+                                    if constexpr (PvNode)
+                                    {
+                                        if (ranked.rank == 1 || shadowValue > alpha)
+                                        {
+                                            (shadowSs + 1)->pv = &shadowChildPv;
+                                            shadowChildPv.clear();
+                                            shadowValue =
+                                              -search<PV>(pos, shadowSs + 1, -beta, -alpha,
+                                                          shadowNewDepth, false);
+                                        }
+                                    }
+
+                                    undo_move(pos, shadowMove);
+                                    result.value = shadowValue;
+                                    result.nodes = u64(nodes) - shadowNodesBefore;
+                                    record.tail.push_back(std::move(result));
+
+                                    if (threads.stop.load(std::memory_order_relaxed))
+                                    {
+                                        record.stopped = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            nodes      = savedNodes;
+                            selDepth   = savedSelDepth;
+                            nmpMinPly  = savedNmpMinPly;
+                            if (movesArenaTop != savedArenaTop)
+                            {
+                                std::cerr << "TERA_LMP_TRACE arena imbalance\n";
+                                std::_Exit(2);
+                            }
+                        lmpTraceRecord = std::move(record);
+                    }
+                }
+            }
+#endif
+            if (moveCount >= baselineLmpThreshold)
+            {
+#ifdef TERA_LMP_TRACE
+                if (lmpTraceRecord && !lmpTraceRecord->baselineTriggerRank)
+                {
+                    lmpTraceRecord->baselineTriggerRank = moveCount;
+                    lmpTraceRecord->baselineTriggerDepth = int(depth);
+                    const std::vector<Move> baselineRemaining = mp.trace_remaining_moves();
+                    for (Move candidate : baselineRemaining)
+                        if (candidate != excludedMove && pos.legal(candidate)
+                            && !pos.capture_stage(candidate))
+                            lmpTraceRecord->baselineSkippedMoves.push_back(
+                              UCIEngine::move(candidate));
+                }
+#endif
                 mp.skip_quiet_moves();
+            }
 
             // Reduced depth of the next LMR search
             int lmrDepth = newDepth - r / 1024;
@@ -1562,6 +1884,16 @@ moves_loop:  // When in check, search starts here
                      -CORRECTION_HISTORY_LIMIT / 4, CORRECTION_HISTORY_LIMIT / 4);
         update_correction_history(pos, ss, *this, 1114 * bonus / 1024);
     }
+
+#ifdef TERA_LMP_TRACE
+    if (lmpTraceRecord)
+    {
+        lmpTraceRecord->bestAfter      = int(bestValue);
+        lmpTraceRecord->baselineCutoff = bestValue >= beta;
+        lmpTraceRecord->baselineBestMove = bestMove ? UCIEngine::move(bestMove) : "";
+        TeraLmpTrace::sink().write(*lmpTraceRecord);
+    }
+#endif
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 

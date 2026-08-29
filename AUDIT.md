@@ -1109,3 +1109,199 @@ encolar trabajo sin alterar el estado epistemológico de un gate; (2) crear una
 carga no equivale a arrancarla: `PENDING`, intentos 0 y máquina nula son el
 recibo falsable; (3) una prioridad declarada forma parte del orden contractual
 y no se eleva para compensar la ausencia temporal de workers.
+
+---
+
+## 2026-08-12 — Libro Terachess v1 y onboarding del runner: **ARTEFACTO PASS / JUEGO OFICIAL PENDIENTE**
+
+**Hipótesis**: P1 no debe entrar en granja con startpos repetido ni con un libro
+sin autenticación. El primer artefacto debe ser determinista, legal según ambos
+oráculos, inmutable por SHA-256 y reconocido por el runner de Terachess con cap
+de al menos 1.000 plies. Registrar el libro no autoriza todavía un SPRT.
+
+**Cambios**:
+
+- `tools/make_book.py` exige desde `717ebd0` el SHA-256 completo de la red antes
+  de arrancar. Con el productor oficial del canary (SHA-256 `40315359…`) y
+  net-2 exacta generó `books/tera_openings_v1.epd`: 5.000 líneas, plies 8–16,
+  5.000 nodos, MultiPV 6, gap 150 cp, límite final 800 cp, seed 2026 y 12
+  descartes. Tiempo **1.087,503 s**.
+- `python tools/validate_book.py --book books/tera_openings_v1.epd --receipt
+  books/tera_openings_v1.epd.receipt.json --expected-lines 5000
+  --expected-raw-sha256 1f117b0e... --json
+  books/tera_openings_v1.validation.json` recorrió las 5.000 posiciones con
+  los oráculos A/B. Resultado: **5.000/5.000** únicas y canónicas, 0
+  discrepancias de legales, 0 terminales y 0 errores; **44,881 s**.
+- Payload: **911.542 B**, SHA-256 raw/text
+  `1f117b0ed03049afad62481494fff9e3232774d188433a99ffff1454d84babe7`.
+  `tools/package_book.py` creó el zip determinista de **132.952 B**, SHA-256
+  `87ed4fba357de4020e42e711c16e9f9a08ec0d6eac12851f224699aafa2cb256`.
+- El checkout central de OpenBench publicó el runner Terachess y cap
+  **1.200 plies** en `b64dd2ac`, el artefacto inmutable en `c716735d` y su
+  registro en `62fa798a`. Los **231** tests del cliente pasaron, con 1 skip.
+  La fuente del libro queda pineada a `c716735d…`, no a una rama móvil.
+- Producción recibió quirúrgicamente el JSON/recibos del libro, conservando el
+  resto de su árbol sucio; `manage.py check` dio 0 errores, se reinició solo
+  `openbench` y `/api/config/` respondió HTTP 200. No se tocó el worker ni una
+  prioridad.
+
+**Decisión**: artefacto y registro **PASS**. Sigue `official_runner_validation:
+false` y `authorized_for_strength_sprt:false`: antes del primer P1 se exige el
+workload `VALIDATION_ONLY` con libro, net-2, cap 1.200 y reloj real. Registrar
+el libro no equivale a probar el runner.
+
+**Learnings**: libro, zip y registro son tres identidades diferentes y las tres
+necesitan recibo. Un libro completamente legal puede seguir sin estar
+autorizado para fuerza hasta que el camino servidor→worker→runner se ejerza de
+extremo a extremo.
+
+---
+
+## 2026-08-12/29 — P1 LMP, arnés causal: **DESARROLLO STOP; HOLDOUT CERRADO**
+
+**Hipótesis**: el LMP de ajedrez es la mayor distorsión de búsqueda restante,
+pero el branching ~180 impide elegir un parche por intuición. Antes de usar los
+seis slots SPRT congelados hay que medir colas quiets desde el estado exacto del
+trigger baseline, demostrar no interferencia y pasar desarrollo+holdout sin
+relajar cobertura después de ver resultados.
+
+**Cambios y controles**:
+
+- `tools/lmp_shadow_roots_v1.json` congela 256 raíces (128 desarrollo/128
+  holdout), SHA-256
+  `099d9eec8ef58f8608cefca4f7011546e8211de6e6b5b02f461741807fd0c661`,
+  derivadas de `data/c3_final.bin` SHA-256 `24671a8c…`. Separación mínima
+  **1.285** registros, plies 13–659 (media 250,41), 26–128 piezas y 51–284
+  legales (media 181,46); ambos oráculos 256/256, 0 fallos y 0 solape con el
+  libro.
+- La instrumentación `TERA_LMP_TRACE` queda compilada fuera de producción.
+  Su replay clona stack/MovePicker, restaura nodos/seldepth/NMP/arena y suprime
+  escrituras TT/historial. Builds aislados BMI2, sin PGO: normal **4.326.107 B**
+  SHA `0a309f16…`; trace **4.393.482 B** SHA `50342abe…`.
+- `python tools/lmp_shadow_harness.py verify-controls ... --root-count 2
+  --nodes 20000 --max-records 12` dio bench **32.541/32.541**, 11 registros,
+  0 errores, búsquedas primarias idénticas en normal/dormant/active y repetición
+  byte-exacta (trace SHA `8921f242…`).
+
+**Autopsia 1 — probe U¾ no era estado baseline**:
+
+- La primera implementación tomaba el snapshot en el trigger U¾ y reconstruía
+  T0 con la profundidad de entrada. Dos pasadas dieron 23.989 registros,
+  SHA-256 común `2621294c…`, pero `analyze` falló cerrado con **39** errores;
+  p. ej. registro 532: trigger real 52 frente a T0 reconstruido 67.
+- Causa: `depth` puede mutar dentro del move loop; además un estado anterior
+  U¾ no puede etiquetar causalmente políticas lenientes desde el posterior
+  trigger baseline. Se separaron modos: `baseline` solo etiqueta U2/D4/barrido
+  leniente; `u34` queda como control direccional independiente. Esas métricas
+  se rechazaron íntegramente.
+
+**Autopsia 2 — última raíz truncada por `quit`**:
+
+- Tras la corrección, dos colecciones de desarrollo parecían limpias: **23.990**
+  registros, tiempos 134,387/156,468 s y SHA-256 byte-idéntico
+  `2144896378f576207e9446b2a677e5ab6f6725024ea9ea87cbf3b8d2049bfd82`.
+  El análisis original reportó 512 checks A/B, 0 errores y seis estratos de
+  3.990–4.000. Señal exploratoria, no Elo: D4 recuperaba 1.995/5.120 casos
+  críticos a +1,2239 % trabajo sombra; U2, 2.076/5.120 a +5,7164 %.
+- Una auditoría posterior del recibo detectó exactamente **1/128** raíz con
+  menos de 100.000 nodos en ambas ejecuciones: ID `7f88541d631042f6`, depth 1,
+  `nodes=0`, bestmove `a4a5`. El transcript muestra el `info ... nodes 0`
+  inmediatamente antes del último bestmove.
+- Causa raíz en `uci_script`: `go` es asíncrono. Cada siguiente
+  `ucinewgame` esperaba la búsqueda anterior, pero el último `go nodes 100000`
+  iba directamente seguido de `quit`; `uci.cpp` procesa `quit` con
+  `engine.stop()`. Por eso siempre se truncaba solo la raíz 128.
+- El arnés ahora termina `go → ucinewgame → quit`, exige ≥100.000 nodos en
+  **128/128**, autentica SHA de raíces y fuente, ambos receipts/traces/
+  transcripts/binarios/red, paths distintos, `100k/1:1/cap24k` exactos y no
+  permite `--limit` ni bajar los mínimos en un PASS. Los defaults del control
+  se corrigieron a la capacidad conocida 2×20.000/12. `python -m unittest
+  tools/test_lmp_shadow_harness.py` da **11/11** y `py_compile` exit 0.
+
+**Validación/decisión**: el análisis endurecido emitió **STOP** aunque el trace
+fuera repetible: dos errores, uno por recibo truncado. Se retira el PASS de
+desarrollo y todas sus métricas quedan solo como diagnóstico. **Holdout nunca
+se abrió** y no existe SPRT P1. Hay que repetir dos pasadas completas de
+desarrollo con la barrera; solo un PASS nuevo permite abrir las 128 raíces
+holdout con parámetros idénticos.
+
+**Estado operativo revalidado el 2026-08-29 08:31:05 UTC**: OpenBench oficial
+mantiene #361 aprobado, prioridad **50**, 0/100 chunks y 0/10 M registros. El
+único worker reciente era máquina 9, `codex_local_worker`, T24, asignado a #407
+prioridad **400** (1/8 chunks). No se cambió ninguna prioridad ni se lanzó el
+desarrollo de un hilo encima del presupuesto de 24 hilos.
+
+**Learnings**: (1) reproducibilidad byte a byte puede reproducir un bug de
+orquestación; (2) todo `go` asíncrono necesita una barrera explícita, incluido
+el último; (3) el recibo debe demostrar que cada raíz consumió su presupuesto,
+no solo contar roots/bestmoves; (4) una señal offline grande no es Elo y una
+sola raíz truncada invalida el gate completo; (5) endurecer un gate después de
+descubrir que era insuficiente obliga a retirar el PASS anterior, no a
+grandfatherizarlo.
+
+---
+
+## 2026-08-29 — Refresh de búsqueda y audit de fruta baja: **INVENTARIO PASS / 0 ELO ATRIBUIDO**
+
+**Hipótesis**: además de NNUE y P1 podían existir supuestos 8×8, deuda de
+correctness o parches upstream ya validados que dieran mejoras baratas. La
+presencia de un TODO o un PASS de ajedrez no basta: cada candidato debía
+clasificarse contra el código compilado, ADR-001 y el branching medido antes de
+crear un workload.
+
+**Cambios**: ninguno en producción ni en una prioridad OpenBench. Se clonó en
+`.scratch/` Stockfish oficial solo para auditoría, pineado por
+`git ls-remote` en
+`8bc5caa2e4b1d4c189b1428e93158b10d3edb0b6`, y se corrigieron
+`docs/search-audit.md`/`docs/staging-program.md`. La antigua P5 SEE se cerró y
+su lugar lo ocupa el clasificador de amenazas de las 26 piezas con presupuesto
+predeclarado de **4 SPRT**.
+
+**Validación**:
+
+- `git rev-list --count ebcea3ef..8bc5caa2` dio **71** commits; restringido a
+  search/search.h/movepick/history/position/movegen/thread dio **24**. El blob
+  `src/history.h` de F1a y el de upstream `ebcea3ef` coincide exactamente:
+  `fc54cbee33905282270e9bbba3101ceb23913c69`.
+- Los candidatos upstream transferibles de velocidad son `50221673`
+  (inicialización shared por nodo NUMA), `5062aee5` (páginas grandes; upstream
+  midió ~+1 % NPS) y `4150d22b` (prefetch). Aquí
+  `ContinuationHistory[2][2]` son **4 × 32 MiB = 128 MiB** por nodo; el clear
+  actual lo repite cada worker, por lo que T24 escribe aproximadamente **3
+  GiB** redundantes al inicializar. Aún no hay NPS local ni Elo.
+- Los cambios de fuerza `356d7c5c`, `218c74ec`, `c5aef2bf`, `c85637b3`,
+  `fa8b6add`, `5f7348f0`, `6d215a03` y `598ae2c4` no forman un lote portable:
+  alteran NMP/futility/LMR/correction con constantes sensibles a la escala de
+  evaluación (peón Terachess = 50). Los fixes `ee515ad9`/`19a02f44` dependen de
+  extensión Syzygy, eliminada del build; la nueva NNUE cambia arquitectura y
+  está fuera del contrato S.
+- La supuesta lectura fuera de rango de `threatByLesser[KING+1]` se falsó:
+  `KING=26`, así que el array tiene **27** entradas, igual que
+  `PIECE_TYPE_NB`. Tampoco es activo el NNUE upstream con bucles de 64
+  casillas: `Makefile` compila únicamente `tera_features.cpp`,
+  `tera_accumulator.cpp` y `tera_network.cpp`.
+- La deuda SEE documentada también era falsa. Desde `94fab4f`, `see_ge`
+  ejecuta `attackers_to(to, occupied)` en cada iteración; esa función recalcula
+  `hopper_captures` y Eagle/Rhino con la ocupación hipotética. Se retiró la
+  familia sin gastar un test.
+- Sonda read-only con `oracle/terachess_b.py` sobre las **256** raíces P1:
+  **46.453** legales, **45.198** quiets y 0 desacuerdos con los conteos del
+  manifiesto. Solo **5.933 (13,127 %)** mueven N/B/R/Q y reciben un
+  `threatByLesser` no vacío; **39.265 (86,873 %)** quedan sin esa señal. Es
+  cobertura de clasificador, no una estimación Elo.
+- `SEARCHEDLIST_CAPACITY=32` no desborda: el push está guardado por
+  `moveCount <= 32`. Sí deja sin malus a la cola tardía en nodos anchos, pero el
+  malus ya decae geométricamente y no se modifica sin medir exposición.
+
+**Decisión**: no existe evidencia honesta de “cientos de Elo” lista para subir.
+P1 sigue primero. Después quedan cuatro candidatos node-identical a perfilar de
+uno en uno (clear NUMA, páginas grandes, prefetch y fusionar el do-and-revert de
+`legal`/`gives_check`) y la nueva P5 de threat tiers, con arnés offline antes de
+granja. No se lanzó ningún SPRT ni se alteró #361/prioridades.
+
+**Learnings**: (1) `KING+1` cambia de significado cuando KING es el tipo 26;
+(2) código residual no listado en `SRCS` no es una ruta de ejecución; (3) una
+deuda escrita puede estar más desactualizada que el código y debe retirarse,
+no perpetuarse; (4) los parches upstream de fuerza son hipótesis nuevas cuando
+cambian tablero, unidades y red; (5) una clase ciega del 86,873 % justifica un
+arnés, no una cifra Elo.

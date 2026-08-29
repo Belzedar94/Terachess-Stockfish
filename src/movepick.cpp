@@ -23,6 +23,12 @@
 #include <limits>
 #include <utility>
 
+#ifdef TERA_LMP_TRACE
+    #include <cstring>
+    #include <memory>
+    #include <vector>
+#endif
+
 #ifdef USE_AVX512
     #include <immintrin.h>
 #endif
@@ -407,5 +413,41 @@ top:
 }
 
 void MovePicker::skip_quiet_moves() { skipQuiets = true; }
+
+#ifdef TERA_LMP_TRACE
+std::vector<Move> MovePicker::trace_remaining_moves() {
+    // Some arena slots have not been initialized yet. Copying their object
+    // values would read indeterminate fields; copying the object representation
+    // as bytes is permitted and lets us restore the exact lazy-picker state.
+    auto arenaImage = std::make_unique<unsigned char[]>(sizeof(ExtMove) * MAX_MOVES);
+    std::memcpy(arenaImage.get(), moves, sizeof(ExtMove) * MAX_MOVES);
+
+    ExtMove* const savedCur            = cur;
+    ExtMove* const savedEndCur         = endCur;
+    ExtMove* const savedEndBadCaptures = endBadCaptures;
+    ExtMove* const savedEndCaptures    = endCaptures;
+    const bool     generatedQuiets     = stage >= GOOD_QUIET && stage <= BAD_QUIET;
+    ExtMove* const savedEndGenerated   = generatedQuiets ? endGenerated : nullptr;
+    const int      savedStage          = stage;
+    const bool     savedSkipQuiets     = skipQuiets;
+
+    std::vector<Move> remaining;
+    Move              move;
+    while ((move = next_move()) != Move::none())
+        remaining.push_back(move);
+
+    std::memcpy(moves, arenaImage.get(), sizeof(ExtMove) * MAX_MOVES);
+    cur            = savedCur;
+    endCur         = savedEndCur;
+    endBadCaptures = savedEndBadCaptures;
+    endCaptures    = savedEndCaptures;
+    if (generatedQuiets)
+        endGenerated = savedEndGenerated;
+    stage      = savedStage;
+    skipQuiets = savedSkipQuiets;
+
+    return remaining;
+}
+#endif
 
 }  // namespace Stockfish

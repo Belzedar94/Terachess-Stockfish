@@ -32,6 +32,7 @@
 #include "memory.h"
 #include "misc.h"
 #include "position.h"
+#include "tera_lmp_shadow.h"
 
 namespace Stockfish {
 
@@ -70,6 +71,10 @@ struct StatsEntry {
     operator T() const { return entry; }
 
     void operator<<(int bonus) {
+#ifdef TERA_LMP_TRACE
+        if (TeraLmpShadow::suppress_writes())
+            return;
+#endif
         // Make sure that bonus is in range [-D, D]
         int clampedBonus = std::clamp(bonus, -D, D);
         T   val          = *this;
