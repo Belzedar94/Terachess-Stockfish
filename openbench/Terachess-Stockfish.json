@@ -10,7 +10,30 @@
     "systems": ["Windows", "Linux"]
   },
   "test_presets": {
-    "default": {}
+    "default": {
+      "base_branch": "711177d601f5e16341277e81a141c63d0e61ef52",
+      "both_bench": 32541,
+      "both_network": "tera-net2.tnn",
+      "book_name": "TERACHESS_openings_v1.epd",
+      "test_bounds": "[0.00, 10.00]",
+      "test_confidence": "[0.05, 0.05]",
+      "win_adj": "movecount=6 score=5000",
+      "draw_adj": "None",
+      "priority": 400,
+      "throughput": 1000,
+      "syzygy_wdl": "DISABLED",
+      "syzygy_adj": "DISABLED"
+    },
+    "STC": {
+      "both_options": "Threads=1 Hash=32",
+      "both_time_control": "10.0+0.10",
+      "workload_size": 32
+    },
+    "LTC": {
+      "both_options": "Threads=1 Hash=128",
+      "both_time_control": "30.0+0.30",
+      "workload_size": 8
+    }
   },
   "tune_presets": {
     "default": {}

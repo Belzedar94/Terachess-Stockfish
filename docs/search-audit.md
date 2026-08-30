@@ -154,7 +154,9 @@ Consecuencias operativas:
    no una propiedad del juego. Regla: cap ≥1.000 plies en toda sonda y SPRT.
 2. La tasa de tablas real es baja (consistente con la predicción del plan <10 %)
    ⇒ SPRT eficiente: cada partida informa ~2× lo que una de ajedrez
-   (1 nElo ≈ 2 Elo). Se mantienen bounds en Elo crudo [1, 6].
+   (1 nElo ≈ 2 Elo). Esa medición conserva valor diagnóstico, pero los tests
+   OpenBench futuros usan los bounds generales `[0,10]` adoptados por el
+   propietario; `[1,6]` queda solo como identidad de resultados históricos.
 3. Coste de una **sonda fixed-nodes** estimado: 5.000 partidas × ~18 s ≈ 25 h
    monohilo ⇒ ~1 h con 24 hilos en paralelo. No es una previsión de STC/LTC:
    el consumo real con reloj queda sujeto al smoke oficial de
@@ -201,7 +203,7 @@ la implementación actual en exchanges con 0/1/2 pantallas antes de medir NPS.
 | ProbCut | Margen fijo sobre beta | Igual que futility (escala) | Idem |
 | TT | Entrada de 12 B, move u32, clave con ep-por-casilla y derechos de salto | Verificado: el estado semántico completo entra en la clave (test_aliasing) | Sin cambios |
 | Repetición / cuckoo | `upcoming_repetition` desactivado (tabla de 8192 no escala a 26 tipos × 256 casillas) | Se pierde detección temprana de repetición; la repetición normal sí funciona | ADR aceptado; re-evaluar con tabla 2^17 en F5 |
-| Gestión de tiempo | Sin cambios respecto a master | Las partidas son 2–4× más largas (plies medios medidos en las sondas) | Medir en F4 antes de fijar TC |
+| Gestión de tiempo | Sin cambios respecto a master | 575 plies de media; smoke #408 sin time losses | STC `10+0,1`; LTC `30+0,3`; cap 1.200 |
 
 ## 11. Refresh upstream y huecos de ordering (2026-08-29)
 

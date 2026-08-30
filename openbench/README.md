@@ -40,14 +40,14 @@ cliente.)
 
 | Parámetro | Valor | Justificación |
 |---|---|---|
-| `test_bounds` | `[1.00, 6.00]` | Tasa de tablas medida **0/80 partidas** (IC95 <3,7 %) ⇒ cada partida informa ~2× que en ajedrez; fase de brecha grande: los neutros deben morir rápido (política Spell) |
+| `test_bounds` | `[0.00, 10.00]` | Metodología general OpenBench adoptada por el propietario el 2026-08-28; sustituye los bounds locales `[1,6]` para todo test futuro |
 | `test_confidence` | `[0.05, 0.05]` | α=β=0,05 |
 | `win_adj` | `movecount=6 score=5000` | Red de seguridad, NO mecanismo necesario: 6/6 partidas del piloto terminaron en mate real. Umbral alto porque la escala cp es Zillions×100 (Amazona=1020) |
 | `draw_adj` | `None` | Con ~0 % de tablas, adjudicar tablas solo introduciría ruido |
-| STC | `60.0+0.6` | Con ~287,5 jugadas por bando, presupuesto nominal máximo `(60/287,5)+0,6` = **~809 ms/jugada**; el consumo real queda pendiente de workload `VALIDATION_ONLY` |
-| LTC | `180.0+1.8` | Escalón ×3: **~2.426 ms/jugada** disponibles; medir reloj y wall-time reales antes de estimar capacidad |
+| STC | `10.0+0.10`, `Threads=1 Hash=32`, workload 32 | Metodología OpenBench vigente; presupuesto nominal máximo ~135 ms/jugada con 287,5 jugadas por bando |
+| LTC | `30.0+0.30`, `Threads=1 Hash=128`, workload 8 | Confirmación obligatoria solo después de H1 en STC; ~404 ms/jugada nominales |
 | `FIXED NODES` | `N=10000` | Reproduce las sondas locales (`tools/parallel_match.py`), útil para comparar builds sin ruido de reloj |
-| Hash | 16 MB (STC) | Ojo: cada hilo ya consume ~200 MB en historiales (32 MiB × 4 continuation + resto). No subir Hash sin comprobar la RAM del worker |
+| Cap | 1.200 plies | La media medida es 575; un cap corto fabrica tablas falsas |
 
 **Aviso de RAM**: el motor usa ~200 MB por hilo en tablas de historial (coste
 del bucketing de 256 casillas). Un worker con `-T 24` necesita ~5 GB solo para
@@ -60,6 +60,8 @@ eso. Medido: 4,2 GB con 20 hilos de datagen.
 - [x] Identidad v41 dentro del chunk (productor/red/libro + resume v2)
 - [x] Formato + auditor + round-trip doble
 - [x] Preset JSON escrito
-- [ ] Libro `tera_openings_v1.epd` generado y subido
-- [ ] Preset instalado en el servidor y primer workload lanzado
+- [x] Libro `TERACHESS_openings_v1.epd` generado, autenticado y registrado
+- [x] Preset DATAGEN instalado y campaña #361 creada
+- [ ] Presets STC/LTC de este fichero desplegados en producción
+- [x] STC correctos creados por CLI: OpenBench #415/#416
 - [x] Bench de referencia del cliente (`bench` a secas) registrado

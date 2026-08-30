@@ -42,6 +42,11 @@ importan (detalle y comandos exactos en `RESULTS.md` y `AUDIT.md`):
 | Calibración estadística (`docs/statistics.md`) | 1 tabla en 606 partidas; 575 plies de media; bounds [1,6] justificados con coste medido |
 | Release 1.0 | Identidad del motor, GPLv3 (`Copying.txt`, `AUTHORS`), notas con limitaciones declaradas |
 
+**Corrección operativa posterior (2026-08-30)**: `[1,6]` en esta tabla describe
+fielmente los resultados históricos y no se reescribe. Para todo nuevo test
+OpenBench, el propietario fijó bounds `[0,10]`, STC `10+0,1` y LTC `30+0,3`;
+véanse `docs/statistics.md` y `docs/staging-program.md`.
+
 ## 3. Activos SOLO LOCALES (no están en git — no los pierdas)
 
 `data/` pesa ~12 GB y está en `.gitignore`. Lo irreemplazable:

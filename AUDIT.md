@@ -1927,3 +1927,105 @@ no es seguro bajo carga compartida; una sonda de procesos que contiene la ruta
 buscada se cuenta a sí misma si no excluye su PID; y un campo llamado
 `max_games` no es un límite real hasta verificar el código que decide
 `finished`.
+
+---
+
+## 2026-08-30 — Corrección de metodología OpenBench: #411/#412 **INVÁLIDOS SIN PARTIDAS**; #415/#416 STC
+
+**Hipótesis corregida por el propietario**: STC no es `60+0,6`, LTC no es
+`180+1,8` y los bounds vigentes no son `[1,6]`. La metodología de la torre es
+STC **10+0,1**, LTC **30+0,3** y bounds **[0,10]**. Una fila creada con el
+contrato equivocado no puede editarse ni reutilizar sus resultados: se detiene
+y se relanza desde cero.
+
+**Autopsia de autoridad**:
+
+- Se leyó entero el `AGENTS.md` indicado: **459 líneas**, SHA-256
+  `8215df6e1042d4d955595b9ec0752c8b7f856a7275d2a78c2d9739c641a6a795`.
+  Su checkout local `c76fcbeb` estaba **34 commits detrás**; aun después de
+  `git fetch`, `origin/spell-runner=e39a8dc9`, el §5b narrativo conservaba la
+  metodología antigua `8+0,08 / 40+0,4` y `[1,6]`. El propio documento dice
+  que los presets efectivos son la fuente de verdad.
+- La decisión posterior que faltaba estaba en `AGENDA-2026-08-28.md`, 55
+  líneas, SHA-256
+  `390017030333e47325fc956b73759b7a2523f6c84510b1de977d3b8e6d343989`:
+  `[0,10]` adoptado para todo salvo Atomic. El propietario confirmó además aquí
+  STC 10 s y LTC 30 s.
+- Producción devolvió `test_presets={"default":{}}` para
+  Terachess-Stockfish. Causa raíz propia: en vez de detenerme ante un preset de
+  fuerza vacío, cloné el smoke #408 y convertí su TC/opciones de validación en
+  un supuesto contrato de fuerza. También privilegié los contratos locales
+  congelados sobre la decisión general más reciente. Ambos razonamientos eran
+  incorrectos.
+
+**Cierre fail-closed de las filas erróneas**:
+
+- Antes de mutar, #411 tenía `book_index=65` y una asignación de la máquina 11,
+  pero el test y su única fila `Result` acreditaban **0 partidas, 0 W/L/D,
+  penta 0/0/0/0/0, 0 crashes y 0 time losses**. #412 seguía sin asignación y
+  también completamente a cero.
+- Una transacción bloqueó ambas filas, volvió a exigir todos esos ceros y
+  aplicó el equivalente exacto del botón web `STOP`: `finished=true` y evento
+  `STOP`. Lectura independiente posterior confirmó #411/#412 detenidos,
+  visibles, sin error y sin un solo dato de fuerza. Sus TC `60+0,60`, Hash 16,
+  bounds `[1,6]` y `max_games=5000` quedan como evidencia del error, no como
+  experimento ni como consumo científico del presupuesto P1.
+
+**Contrato correcto y reemplazos**:
+
+- STC: `10.0+0.10`, `Threads=1 Hash=32`, workload 32. LTC condicional:
+  `30.0+0.30`, `Threads=1 Hash=128`, workload 8. Bounds `[0,10]`,
+  α=β=0,05, LLR `[-2,944438979; +2,944438979]`, SPRT pentanomial y
+  `max_games=0` como en OpenBench. Se conservan únicamente los parámetros
+  Terachess medidos: net-2 en ambos lados, libro v1, adjudicación
+  `movecount=6 score=5000`, `draw_adj=None`, Syzygy deshabilitado y cap del
+  runner en 1.200 plies. Prioridad 400 según orden del propietario.
+- D4 se relanzó como **#415 `p1-lmp-d4-stc10`**, commit
+  `ab7a8edcb0b891ae88af778a6842f3bd4d8ecff4`, bench 96.916. U3/4 como
+  **#416 `p1-lmp-u34-stc10`**, commit
+  `763144ed80203a14453ec8767c494d7f21dadd5e`, bench 27.855. Baseline común:
+  `711177d601f5e16341277e81a141c63d0e61ef52`, bench 32.541.
+- La transacción creó ambas o ninguna, reinició todos los contadores y flags,
+  y registró `CREATE P=400 TP=1000`. Readback independiente: ambas aprobadas,
+  0 partidas, penta cero, LLR 0, sin error y páginas públicas HTTP 200.
+  **No se creó LTC**: solo se autoriza después de que el STC correspondiente
+  cruce H1.
+
+**Cambios durables**: `openbench/Terachess-Stockfish.json` deja de tener
+presets de fuerza vacíos y codifica default + STC + LTC; `openbench/README.md`,
+`docs/statistics.md`, `docs/staging-program.md`, `docs/search-audit.md` y
+`TRANSFER.md` distinguen los resultados históricos `[1,6]` del contrato futuro
+`[0,10]`. El JSON local aún requiere un despliegue controlado; no se reinició
+el OpenBench compartido ni se tocó su checkout sucio.
+
+La validación pre-commit detectó que el primer borrador del preset había puesto
+por error el **tree object** `0d510e5a...` en `base_branch`. `git cat-file -t`
+devolvió `tree`, no `commit`; se sustituyó por el baseline autenticado
+`711177d...` antes del commit y nunca llegó a producción.
+
+**Validación final reproducible**:
+
+- `python -m unittest tools.test_lmp_shadow_harness` → **13/13 OK**.
+- `OpenBench.config.verify_engine_*` sobre el JSON y asserts de sus tres
+  presets → `OPENBENCH_PRESET_PASS`: `[0,10]`, prioridad 400, STC
+  `10.0+0.10`, LTC `30.0+0.30`; `git diff --check` → 0 errores.
+- Desde el layout firmado del artefacto, SHA-256 de net-2
+  `05162b61...e52861` y `terachess-p1-base-f26d8b0.exe bench` → **32.541
+  nodos**.
+- `Invoke-WebRequest` a `/test/{411,412,415,416}/` → HTTP 200; #411/#412
+  `data-live=0`, 0 partidas; #415/#416 `data-live=1`, TC correcto, prioridad
+  400, workload 32 y 0 partidas.
+- Inventario por nombre de `python` más argv exacto del cliente Terachess →
+  **0 procesos**; `openbench.exit` continúa presente. No se reactivó el worker
+  local.
+
+**Decisión**: #411/#412 son **INVÁLIDOS / 0 PARTIDAS** y jamás pueden citarse
+como fuerza. Los únicos P1 activos son #415/#416, que consumen 2/6 slots si
+llegan a jugar. U2 sigue rechazado por el gate offline. Ningún gate fue
+relajado después de observar un resultado: no existía resultado alguno.
+
+**Learnings**: un smoke de reloj no es un preset STC; un preset vacío es un
+bloqueo, no permiso para heredar parámetros; una guía puede estar completa y
+aun así estar superseded por una decisión posterior; y antes de relanzar un
+SPRT hay que autenticar tanto los contadores agregados como cada `Result` por
+máquina.

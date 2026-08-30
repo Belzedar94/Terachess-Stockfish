@@ -38,11 +38,16 @@ los bounds se declaran **en Elo crudo** y pueden ser estrechos.
 
 ## 4. Bounds de SPRT
 
-**Fase de brecha grande (actual): `[1.00, 6.00]` con α = β = 0,05**
-(→ límites de LLR [−2,94, +2,94]).
+**Contrato OpenBench vigente desde la corrección del propietario del
+2026-08-30: `[0.00, 10.00]` con α = β = 0,05** (límites de LLR
+[−2,94, +2,94]). La decisión general ya constaba como adoptada el 2026-08-28;
+se aplicó aquí antes de que #411/#412 produjeran una sola partida. No se
+estrechan bounds automáticamente después de mirar resultados.
 
-Coste de resolución con estos bounds, calculado con la fórmula de Wald
-implementada en `tools/sprt.py` (LLR = n·(s₁−s₀)·(x̄ − (s₀+s₁)/2)/σ̂²):
+La tabla siguiente conserva la calibración histórica `[1,6]` de las sondas
+locales a nodos fijos. Explica decisiones anteriores y resultados publicados,
+pero **ya no autoriza nuevos workloads OpenBench**. Se calculó con la fórmula
+de Wald implementada en `tools/sprt.py`:
 
 | Efecto real | Partidas hasta cruzar ±2,94 |
 |---|---|
@@ -57,26 +62,22 @@ Este cálculo describe exclusivamente las sondas locales a **10.000 nodos**;
 no es un pronóstico de los presets STC/LTC con reloj y no se usará para
 dimensionar OpenBench hasta completar el smoke oficial de §5.
 
-**Paso a `[0.00, 3.00]`** cuando dos SPRT consecutivos pasen con <3.000
-partidas (síntoma de que la fruta baja se acabó). Política heredada de Spell.
-
 ## 5. Control de tiempo
 
-Presupuesto nominal derivado de la longitud de partida, no copiado de ajedrez:
-con 575 plies cada bando juega ~287,5 veces. La estimación original dividió
-solo el tiempo base entre las jugadas y **omitió el incremento**; por tanto sus
-~200/~600 ms por jugada eran incorrectos por un factor próximo a cuatro.
+La metodología OpenBench vigente fija STC/LTC; la longitud medida permite
+traducir esos controles a un presupuesto nominal. Con 575 plies cada bando
+juega ~287,5 veces:
 
-| Preset | TC | presupuesto máximo nominal por jugada |
+| Preset | TC / opciones | presupuesto máximo nominal por jugada |
 |---|---|---|
-| STC | 60,0 + 0,6 | `(60/287,5)+0,6` = **~809 ms** |
-| LTC | 180,0 + 1,8 | `(180/287,5)+1,8` = **~2.426 ms** |
-| FIXED NODES | N=10000 | (sin reloj; para sondas A/B entre builds propios) |
+| STC | `10,0+0,1`; Threads=1 Hash=32; workload 32 | `(10/287,5)+0,1` = **~135 ms** |
+| LTC | `30,0+0,3`; Threads=1 Hash=128; workload 8 | `(30/287,5)+0,3` = **~404 ms** |
+| FIXED NODES | N=10000 | (sin reloj; solo sondas A/B entre builds propios) |
 
-Esos valores son tiempo **disponible**, no consumo observado: el motor puede
-acabar cada jugada antes. Antes del primer SPRT se exige un workload oficial
-`VALIDATION_ONLY` que registre tiempo real, reloj restante y percentiles por
-máquina; estas cifras no se usan para pronosticar duración ni capacidad.
+Esos valores son tiempo **disponible**, no consumo observado. El smoke oficial
+#408 ejercitó `wtime/btime`, cap 1.200 y el runner real sin time losses, pero su
+TC `60+0,6` era de validación y **no era STC**. #415/#416 son los primeros STC
+con el contrato correcto.
 
 **LTC de confirmación siempre** antes de mergear: la lección del sign-flip de
 Spell (+30 STC / −27 LTC) aplica igual aquí y aún no hemos medido si Terachess

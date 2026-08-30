@@ -55,8 +55,12 @@ barrera `ucinewgame` antes de `quit`, y las **128/128** raíces deben acreditar
 ≥100.000 nodos: una sola raíz truncada invalida el pase completo.
 
 **Matriz congelada: seis SPRT son tres pares STC/LTC**, todos contra el mismo
-baseline net-2, bounds raw-Elo `[1, 6]`, α=β=0,05, máximo 5.000 partidas y cap
-1.200 plies:
+baseline net-2. Corrección del propietario del 2026-08-30, aplicada antes de
+que existiera una sola partida de fuerza válida: metodología OpenBench con
+bounds `[0, 10]`, α=β=0,05 y cap 1.200 plies. STC usa `10.0+0.10`,
+`Threads=1 Hash=32`, workload 32; LTC usa `30.0+0.30`,
+`Threads=1 Hash=128`, workload 8. Un SPRT termina por LLR, sin un
+`max_games` artificial.
 
 1. `U2`: `T = 2·T0`, STC; su LTC solo si STC cruza H1.
 2. `D4`: LMP desactivado solo cuando la profundidad corriente `d ≤ 4`, STC;
@@ -125,7 +129,7 @@ neutralizada por ADR-001).
 
 ## Condición de salida del programa
 
-Si tras agotar P1 y P2 (12 SPRT) ninguna variante supera los bounds [1, 6], la
+Si tras agotar P1 y P2 (12 SPRT) ninguna variante supera los bounds [0, 10], la
 hipótesis "las constantes chess-tuned son el techo de esta búsqueda" queda
 falsada y el esfuerzo se redirige a datos y arquitectura de red (P6), no a más
 tuning de búsqueda.
